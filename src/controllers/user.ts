@@ -58,9 +58,10 @@ const searchUser = TryCatch(async(req:Request,
    const filterQuery = req?.query?.filter
     
    const users = await db.query.user.findMany({
-    columns:{name:true,id:true},
+    columns:{password:false},
     where:(user,{ilike})=> ilike(user.name ,`%${filterQuery}%`)
-   })
+    
+})
     return res.json({
         success:true,
         users
