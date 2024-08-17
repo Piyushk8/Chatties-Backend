@@ -151,6 +151,7 @@ const SendAttachment = TryCatch(async(req:Request<{},{},{chatId:string}>
     
         
     const files: CloudinaryFile[] = req.files as CloudinaryFile[];
+    console.log(files)
     if (!files || files.length === 0) {
         return next(new Error('No files provided'));
     }

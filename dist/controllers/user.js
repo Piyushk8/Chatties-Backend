@@ -4,17 +4,23 @@ import { TryCatch } from "../middlewares/error.js";
 import ErrorHandler from "../utils/utility.js";
 import { eq } from "drizzle-orm";
 import { sendToken } from "../utils/feature.js";
+import { uploadToCloudinary } from "../utils/cloudinary.js";
 //!zod for userbody
 const newUser = TryCatch(async (req, res, next) => {
-    const { username, name, password, avatar } = req.body;
-    const result = await db.insert(user).values({
-        name, password, avatar, username
+    const { username, name, password } = req.body;
+    const file = req.file;
+    console.log(file, username);
+    const urls = await uploadToCloudinary([file]);
+    const newUser = await db.insert(user).values({
+        name, password, avatar: { url: urls[0], public_id: name }, username
     }).returning({
         id: user.id,
         name: user.name
     });
+    // sendToken(res,result[0],200,"User created")
     return res.json({
         success: true,
+        newUser,
         message: "user created"
     });
     // emitEvet(())   

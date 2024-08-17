@@ -126,6 +126,7 @@ const SendAttachment = TryCatch(async (req, res, next) => {
     if (!chat)
         return next(new ErrorHandler("chat not found", 404));
     const files = req.files;
+    console.log(files);
     if (!files || files.length === 0) {
         return next(new Error('No files provided'));
     }

@@ -30,7 +30,7 @@ export const uploadToCloudinary = async (files = []) => {
         });
     });
     try {
-        const result = await Promise.all(uploadPromise);
+        const results = await Promise.all(uploadPromise);
         return cloudinaryUrls;
     }
     catch (error) {
