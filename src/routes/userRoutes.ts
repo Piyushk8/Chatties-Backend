@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, newUser, searchUser } from "../controllers/user.js";
+import { getMyDetails, login, newUser, searchUser } from "../controllers/user.js";
 import { authMiddleware } from "../middlewares/auth.js";
 import { singleAvatar } from "../middlewares/multer.js";
 
@@ -9,8 +9,9 @@ import { singleAvatar } from "../middlewares/multer.js";
 userRouter.post("/signup",singleAvatar,newUser)
 userRouter.post("/login",login)
 
-userRouter.use(authMiddleware)
-userRouter.get("/search",searchUser)
+
+userRouter.get("/search",authMiddleware,searchUser)
+userRouter.get("/me",authMiddleware,getMyDetails)
 
 
 

@@ -22,6 +22,27 @@
       "when": 1723894224968,
       "tag": "0002_flaky_logan",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1724261815510,
+      "tag": "0003_conscious_hellion",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1724327362189,
+      "tag": "0004_steady_luke_cage",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1724348154852,
+      "tag": "0005_shallow_the_enforcers",
+      "breakpoints": true
     }
   ]
 }
