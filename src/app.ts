@@ -14,6 +14,7 @@ import { NextFunction} from "express"
 import {chat, message as MessageSchema ,user as userSchema} from "./drizzle/schema.js"
 import { getMyFriendsSockets } from "./utils/getMyFriendsSockets.js";
 import { eq } from "drizzle-orm";
+import { errorMiddleware } from "./middlewares/error.js";
 
 const app = express();
 const server = createServer(app)
@@ -50,10 +51,10 @@ app.use(cors({
    export const onlineUsers = new Set(); 
 
 
-app.use("/api/v1",mainRouter)
-app.set("io",io);
+   app.use("/api/v1",mainRouter)
+   app.set("io",io);
+   io.use(socketAuth);
 
-io.use(socketAuth);
 
 export async function getOnlineUsers() {
   const onlineUsers = await db.select({ id: userSchema.id })
@@ -62,23 +63,11 @@ export async function getOnlineUsers() {
   return onlineUsers.map(u => u.id);
 }
 
-// export async function broadcastOnlineUsers() {
-//   console.log("Boradcastonlineuser")
-//   const onlineUsers = await getOnlineUsers();
-//   console.log(onlineUsers)
-//   io.emit(ONLINE_USER, { onlineUsers });
-// }
-// const HEARTBEAT_INTERVAL = 30000; // 30 seconds
-// const HEARTBEAT_TIMEOUT = 60000
-
-
-
-
 
 io.on("connection", async(socket:CustomSocket )=>{
   const user = socket.user;
   socketIds.set(user?.id, socket.id);
-  //console.log(socket.id,user?.id,"connected")
+  console.log(socket.id,user?.id,"connected")
  // console.log(socketIds,user)
   if(user){ //online users update
     await db.update(userSchema) 
@@ -87,26 +76,22 @@ io.on("connection", async(socket:CustomSocket )=>{
     let userId = user.id
     
     const onlineUsers = await getOnlineUsers();
-   console.log(onlineUsers)
+   //console.log(onlineUsers)
     io.emit(ONLINE_USER, {onlineUsers});
+  }else{
+    socket.disconnect();
+    return;
   }
 
-  // let heartbeatTimeout: NodeJS.Timeout;
-
-  // function resetHeartbeat() {
-  //   if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
-  //   heartbeatTimeout = setTimeout(async () => {
-  //     if (user) {
-  //       await handleUserOffline(user.id);
-  //     }
-  //     socket.disconnect(true);
-  //   }, HEARTBEAT_TIMEOUT);
-  // }
-
-  // socket.on('heartbeat', resetHeartbeat);
-  // resetHeartbeat();
-
-  
+  socket.on("userLoggedIn", async ({user}) => {
+    console.log("log user",user)
+    if (user) {
+        await db.update(userSchema)
+            .set({ isOnline: true })
+            .where(eq(userSchema?.id, user.id));
+        io.emit("userStatusChange", {userId:user.id });
+    }
+});
   
   socket.on(NEW_MESSAGE, async ({ chatId, members, message }) => {
     //the message for real-time updates
@@ -178,14 +163,15 @@ io.on("connection", async(socket:CustomSocket )=>{
        console.log(`${socket.id} disconencted`)
        socketIds.delete(user?.toString())
 
-      //  const userId = socketIds.get(socket.id)
-      //  if(user?.id) {
-      //   await db.update(userSchema)
-      //   .set({isOnline:false})
-      //   .where(eq(userSchema?.id,user.id))
-      //   io.emit("userStatusChange",{})
-      // }
-      // await handleUserOffline(user?.id||"");
+       const userId = socketIds.get(socket.id)
+       if(user?.id) {
+        await db.update(userSchema)
+        .set({isOnline:false})
+        .where(eq(userSchema?.id,user.id))
+        const onlineUsers = await getOnlineUsers();
+        console.log(onlineUsers)
+        io.emit("userStatusChange",{userId:user.id})
+      }
 
   })
    

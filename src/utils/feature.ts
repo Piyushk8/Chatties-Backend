@@ -1,14 +1,8 @@
 
-// const TryCatch=(passedfunction:)=> async(req,res,next)=>{
-//     try{
-
 import { Response } from "express"
 
 import Jwt from "jsonwebtoken"
-import { user } from "../drizzle/schema.js";
-import { db } from "../drizzle/migrate.js";
-import { eq } from "drizzle-orm";
-// import { broadcastOnlineUsers } from "../app.js";
+
 const cookieOption = {
     maxAge: 1000 * 60 * 60 * 24, 
     sameSite: 'none',
@@ -23,7 +17,7 @@ const sendToken = (res:Response,user:{id:string,name:string},code:number,message
         secure: true,}
         )
         .json({
-        sucsess:true,
+        success:true,
         user,
         message
     })

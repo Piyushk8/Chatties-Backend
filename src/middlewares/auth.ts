@@ -48,20 +48,19 @@ export async function socketAuth(socket: CustomSocket, next: (err?: Error) => vo
         if (err) {
           return next(err);
         }
-        // Extract token from cookies
         const tokenBearer = req.cookies?.token;
         
         if (true) {
-          // Authenticate the user with the extracted token
+         
           const user = await authenticateUser(tokenBearer);
-          // console.log("user",user)
+         
           if (user) {
-            // Assign the authenticated user to socket.user
-            socket.user = user;
+          socket.user = user;
             return next();
           }
+          if(!user)return next(new ErrorHandler("Please login to access",401)) 
         }
-  
+        
         // If authentication fails, pass an error to the next middleware
         
       });

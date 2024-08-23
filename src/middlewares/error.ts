@@ -1,5 +1,4 @@
 import {  NextFunction, Request, Response } from "express";
-import { message } from "../drizzle/schema.js";
 import ErrorHandler from "../utils/utility.js";
 import { ControllerType } from "../types/types.js";
 
@@ -9,6 +8,7 @@ export const errorMiddleware=(err:ErrorHandler
     res:Response,
     next:NextFunction
 )=>{
+    console.log("here",err)
     err.message||=""
     return res.status(err.statusCode).json({
         success:false,

@@ -10,7 +10,7 @@ import { config } from "dotenv"
 import { emitEvent, getBase64 } from "../utils/helper.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { Request, Response } from "express";
-import { REFETECH_CHATS } from "../constants/events.js";
+import { NEW_MESSAGE, REFETECH_CHATS } from "../constants/events.js";
 
 config({path:"../.env"})
 cloudinary.config({
@@ -18,7 +18,6 @@ cloudinary.config({
     ,api_key:process.env.CLOUDINARY_API_KEY
     ,api_secret:process.env.CLOUDINARY_SECRET_KEY
 })
-
 
 const createChat = TryCatch(async(req,res,next)=>{
     //MY userid
@@ -192,8 +191,8 @@ const getMessages = TryCatch(async (req, res, next) => {
     const totalMessages = totalMessagesResult[0].count;
 
     // Return the messages as a JSON response
-   
     const messages = result.reverse()
+    
     return res.json({
         messages,  
         totalMessages,
@@ -206,7 +205,7 @@ export default getMessages;
 const SendAttachment = TryCatch(async(req:Request<{},{},{chatId:string}>
     ,res:Response
     ,next)=>{
-        // console.log(req.file)
+         
     const{ chatId } = req.body
     const chat = await db.query.chat.findFirst({
         where:(chat,{eq})=>eq(chat.id,chatId)})
@@ -218,12 +217,10 @@ const SendAttachment = TryCatch(async(req:Request<{},{},{chatId:string}>
     
         
     const files: CloudinaryFile[] = req.files as CloudinaryFile[];
-    console.log(files)
     if (!files || files.length === 0) {
         return next(new Error('No files provided'));
     }
     const cloudinaryUrls = await uploadToCloudinary(files)
-    console.log(cloudinaryUrls)
 
     const messageForDb = {
         content:"",
@@ -242,7 +239,6 @@ const SendAttachment = TryCatch(async(req:Request<{},{},{chatId:string}>
     const result = await db.insert(message).values(messageForDb)
 
     //!emitevent new message || new message Alert
-
 
 res.status(200).json({
     message:"Done"
