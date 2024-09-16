@@ -47,40 +47,30 @@ export async function getOnlineUsers() {
         .where(eq(userSchema.isOnline, true));
     return onlineUsers.map(u => u.id);
 }
-// export async function broadcastOnlineUsers() {
-//   console.log("Boradcastonlineuser")
-//   const onlineUsers = await getOnlineUsers();
-//   console.log(onlineUsers)
-//   io.emit(ONLINE_USER, { onlineUsers });
-// }
-// const HEARTBEAT_INTERVAL = 30000; // 30 seconds
-// const HEARTBEAT_TIMEOUT = 60000
 io.on("connection", async (socket) => {
     const user = socket.user;
     socketIds.set(user?.id, socket.id);
-    //console.log(socket.id,user?.id,"connected")
+    console.log(socket.id, user?.id, "connected");
     // console.log(socketIds,user)
-    if (user) { //online users update
+    if (user?.id) { //online users update
+        console.log("user chekc");
         await db.update(userSchema)
             .set({ isOnline: true })
             .where(eq(userSchema?.id, user?.id));
         let userId = user.id;
         const onlineUsers = await getOnlineUsers();
-        console.log(onlineUsers);
+        //console.log(onlineUsers)
         io.emit(ONLINE_USER, { onlineUsers });
     }
-    // let heartbeatTimeout: NodeJS.Timeout;
-    // function resetHeartbeat() {
-    //   if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
-    //   heartbeatTimeout = setTimeout(async () => {
+    //   socket.on("userLoggedIn", async ({user}) => {
+    //     console.log("log user",user)
     //     if (user) {
-    //       await handleUserOffline(user.id);
+    //         await db.update(userSchema)
+    //             .set({ isOnline: true })
+    //             .where(eq(userSchema?.id, user.id));
+    //         io.emit("userStatusChange", {userId:user.id });
     //     }
-    //     socket.disconnect(true);
-    //   }, HEARTBEAT_TIMEOUT);
-    // }
-    // socket.on('heartbeat', resetHeartbeat);
-    // resetHeartbeat();
+    // });
     socket.on(NEW_MESSAGE, async ({ chatId, members, message }) => {
         //the message for real-time updates
         const messageForRealTime = {
@@ -96,11 +86,13 @@ io.on("connection", async (socket) => {
         // All members including sender console.log(members,"members")
         const membersAndME = [...members, { user }];
         const membersSocket = getSockets(membersAndME);
+        const AlertMembersSockets = getSockets(members);
         io.to(membersSocket).emit(NEW_MESSAGE, {
             chatId,
             message: messageForRealTime,
         });
-        io.to(membersSocket).emit(NEW_MESSAGE_ALERT, { chatId });
+        //  socket.broadcast.to(membersSocket).emit(NEW_MESSAGE_ALERT, { chatId });
+        io.to(AlertMembersSockets).emit(NEW_MESSAGE_ALERT, { chatId });
         try {
             // Validate the required fields
             //  the message for database insertion
@@ -118,7 +110,7 @@ io.on("connection", async (socket) => {
             //@ts-ignore
             const result = await db.insert(MessageSchema).values(messageForDB);
             if (result) {
-                await db.update(chat).set({ lastMessage: message })
+                await db.update(chat).set({ lastMessage: message, unread: true })
                     .where(eq(chat.id, chatId));
             }
             console.log('Insert result:', result);
@@ -142,14 +134,15 @@ io.on("connection", async (socket) => {
     socket.on("disconnect", async () => {
         console.log(`${socket.id} disconencted`);
         socketIds.delete(user?.toString());
-        //  const userId = socketIds.get(socket.id)
-        //  if(user?.id) {
-        //   await db.update(userSchema)
-        //   .set({isOnline:false})
-        //   .where(eq(userSchema?.id,user.id))
-        //   io.emit("userStatusChange",{})
-        // }
-        // await handleUserOffline(user?.id||"");
+        const userId = socketIds.get(socket.id);
+        if (user?.id) {
+            await db.update(userSchema)
+                .set({ isOnline: false })
+                .where(eq(userSchema?.id, user.id));
+            const onlineUsers = await getOnlineUsers();
+            console.log(onlineUsers);
+            io.emit("userStatusChange", { userId: user.id });
+        }
     });
 });
 const PORT = 3000;

@@ -1,7 +1,4 @@
-// const TryCatch=(passedfunction:)=> async(req,res,next)=>{
-//     try{
 import Jwt from "jsonwebtoken";
-// import { broadcastOnlineUsers } from "../app.js";
 const cookieOption = {
     maxAge: 1000 * 60 * 60 * 24,
     sameSite: 'none',
@@ -15,7 +12,7 @@ const sendToken = (res, user, code, message) => {
         secure: true,
     })
         .json({
-        sucsess: true,
+        success: true,
         user,
         message
     });

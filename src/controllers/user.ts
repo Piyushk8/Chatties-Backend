@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { db } from "../drizzle/migrate.js";
-import { user  } from "../drizzle/schema.js";
+import { message, user  } from "../drizzle/schema.js";
 import { CloudinaryFile, loginRequestBody, newUserRequestBody } from "../types/types.js";
 import { TryCatch } from "../middlewares/error.js";
 import ErrorHandler from "../utils/utility.js";
@@ -66,7 +66,8 @@ const getMyDetails = TryCatch(async(req,res,next)=>{
         }
     })
     if( !user) next(new ErrorHandler("no user found",404))
-    res.json({
+      
+        res.json({
         success:true,
         user,isAuth:true 
     })
@@ -80,10 +81,10 @@ const searchUser = TryCatch(async(req:Request,
     const userId  = res.locals.userId;
     
    const filterQuery = req?.query?.filter
-    
+    console.log(filterQuery)
    const users = await db.query.user.findMany({
     columns:{password:false},
-    where:(user,{ilike,ne})=> ilike(user.name ,`%${filterQuery}%`) && ne(user.id,userId)
+    where:(user,{ilike,ne,and})=>and( ilike(user.name ,`${filterQuery}%`) ,ne(user.id,userId))
     
 })
     return res.json({
@@ -91,7 +92,19 @@ const searchUser = TryCatch(async(req:Request,
         users
     })
 })
+const logout = TryCatch(async(req,res,next)=>{
+const userId = res.locals.userId;
+console.log(userId)
+return res.status(200).cookie("token","", {
+    maxAge:1000*60*60*24*15,sameSite:"none",
+    httpOnly:true,
+    secure:true
+}).json({
+    message:"LoggetOut succesfully!",
+    success:true
+})
 
+})
 export{
-    newUser,login,searchUser,getMyDetails
+  logout,  newUser,login,searchUser,getMyDetails
 }

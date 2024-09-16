@@ -69,7 +69,8 @@ io.on("connection", async(socket:CustomSocket )=>{
   socketIds.set(user?.id, socket.id);
   console.log(socket.id,user?.id,"connected")
  // console.log(socketIds,user)
-  if(user){ //online users update
+  if(user?.id){ //online users update
+    console.log("user chekc")
     await db.update(userSchema) 
     .set({isOnline:true})
     .where(eq(userSchema?.id,user?.id))
@@ -78,20 +79,16 @@ io.on("connection", async(socket:CustomSocket )=>{
     const onlineUsers = await getOnlineUsers();
    //console.log(onlineUsers)
     io.emit(ONLINE_USER, {onlineUsers});
-  }else{
-    socket.disconnect();
-    return;
   }
-
-  socket.on("userLoggedIn", async ({user}) => {
-    console.log("log user",user)
-    if (user) {
-        await db.update(userSchema)
-            .set({ isOnline: true })
-            .where(eq(userSchema?.id, user.id));
-        io.emit("userStatusChange", {userId:user.id });
-    }
-});
+//   socket.on("userLoggedIn", async ({user}) => {
+//     console.log("log user",user)
+//     if (user) {
+//         await db.update(userSchema)
+//             .set({ isOnline: true })
+//             .where(eq(userSchema?.id, user.id));
+//         io.emit("userStatusChange", {userId:user.id });
+//     }
+// });
   
   socket.on(NEW_MESSAGE, async ({ chatId, members, message }) => {
     //the message for real-time updates
@@ -108,13 +105,13 @@ io.on("connection", async(socket:CustomSocket )=>{
   // All members including sender console.log(members,"members")
     const membersAndME:userType[] = [...members,{user}]
     const membersSocket = getSockets(membersAndME);
-
+    const AlertMembersSockets = getSockets(members)
     io.to(membersSocket).emit(NEW_MESSAGE, {
       chatId,
       message: messageForRealTime,
     });
-    io.to(membersSocket).emit(NEW_MESSAGE_ALERT, { chatId });
-  
+  //  socket.broadcast.to(membersSocket).emit(NEW_MESSAGE_ALERT, { chatId });
+  io.to(AlertMembersSockets).emit(NEW_MESSAGE_ALERT,{chatId})
     try {
       // Validate the required fields
       //  the message for database insertion
@@ -134,7 +131,7 @@ io.on("connection", async(socket:CustomSocket )=>{
       //@ts-ignore
      const result = await db.insert(MessageSchema).values(messageForDB);
      if(result) {
-       await db.update(chat).set({lastMessage:message})
+       await db.update(chat).set({lastMessage:message,unread:true})
         .where(eq(chat.id,chatId))
         }
       console.log('Insert result:', result);

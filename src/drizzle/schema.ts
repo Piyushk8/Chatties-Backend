@@ -9,7 +9,7 @@ export const user = pgTable('user', {
   name: text('name').notNull(),
   password: text('password').notNull(),
   createdAt: timestamp('createdAt').defaultNow(), 
-  isOnline:boolean("online")
+  isOnline:boolean("online"),
 }
 ,table=>{
   return{
@@ -20,13 +20,13 @@ export const user = pgTable('user', {
 }
 );
 
-
 export const chat = pgTable('chat', {
   id: uuid('id').defaultRandom().primaryKey(),
   chatname: text('chatname').notNull(),
   groupChat:boolean("groupChat").default(false),
   createdAt: timestamp('createdAt').defaultNow(),
   lastMessage:text('lastMessage'),
+  unread:boolean("unread"),
   lastSent:timestamp("lastSent").notNull().defaultNow().$onUpdate(() => new Date()),
 },table=>{
   return{
@@ -37,7 +37,7 @@ export const chat = pgTable('chat', {
 
 export const message = pgTable('message', {
   id: uuid("id").defaultRandom().primaryKey(),
-  chatId: uuid('chatId').notNull().references(() => chat.id),
+  chatId: uuid('chatId').notNull().references(() => chat.id,{onDelete:"cascade"}),
   content: text('content'),
   attachment: jsonb('attachment').array(),
   sender: uuid('sender')
@@ -63,8 +63,15 @@ export const chatMembers = pgTable('chatMembers', {
   }
 });
 
-
-
+export const pinnedChats = pgTable('pinnedChats', {
+  id: uuid("id").defaultRandom().primaryKey(),
+chatId: uuid('chatId').notNull().references(() => chat.id,{onDelete:"cascade"}),
+userId: uuid('userId').notNull().references(() => user.id,{onDelete:"cascade"}),
+}, (table) => {
+return {
+  pinnedChatIndex: index("pinnedChatIndex").on(table.chatId, table.userId) // New composite index
+}
+});
 export const userRelations = relations(user, ({ many }) => ({
     sentMessages: many(message, {
      relationName:"sentMessage"
@@ -73,6 +80,7 @@ export const userRelations = relations(user, ({ many }) => ({
         relationName:"Chats"
     }),
   }));
+
 
 
 

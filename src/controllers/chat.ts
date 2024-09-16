@@ -10,7 +10,7 @@ import { config } from "dotenv"
 import { emitEvent, getBase64 } from "../utils/helper.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { Request, Response } from "express";
-import { NEW_MESSAGE, REFETECH_CHATS } from "../constants/events.js";
+import { NEW_MESSAGE, NEW_MESSAGE_ALERT, REFETECH_CHATS } from "../constants/events.js";
 
 config({path:"../.env"})
 cloudinary.config({
@@ -138,11 +138,14 @@ const getMyChats= TryCatch(async(req,res,next)=>{
                 }
             },
             chat:{
-                columns:{lastMessage:true,lastSent:true}
+                columns:{unread:true,lastMessage:true,lastSent:true}
             }
         }
     })
-   
+    // const pinnedChats = await db.query.pinnedChats.findMany({
+    //     where:(pinnedChats,{eq})=>eq(pinnedChats.userId,userId),
+        
+    // })
     
     
     res.status(200).json({
@@ -200,7 +203,6 @@ const getMessages = TryCatch(async (req, res, next) => {
     });
 });
 
-export default getMessages;
 
 const SendAttachment = TryCatch(async(req:Request<{},{},{chatId:string}>
     ,res:Response
@@ -208,7 +210,14 @@ const SendAttachment = TryCatch(async(req:Request<{},{},{chatId:string}>
          
     const{ chatId } = req.body
     const chat = await db.query.chat.findFirst({
-        where:(chat,{eq})=>eq(chat.id,chatId)})
+        where:(chat,{eq})=>eq(chat.id,chatId),
+        })
+    const members = await db.query.chatMembers.findMany({
+        where:(chatMembers,{eq})=>eq(chatMembers.chatId ,chatId ),
+        columns:{
+            userId:true
+        }
+    })
     const me = await db.query.user.findFirst({
         where:(user,{eq})=>eq(user.id,res.locals.userId)
     })
@@ -237,18 +246,50 @@ const SendAttachment = TryCatch(async(req:Request<{},{},{chatId:string}>
         }
     }
     const result = await db.insert(message).values(messageForDb)
-
+    
+    const membersId = members.map((i)=>i.userId)
     //!emitevent new message || new message Alert
+    // emitEvent(req,REFETECH_CHATS,membersId,chatId)
+    emitEvent(req,NEW_MESSAGE,[...membersId,res.locals.userId],messageForRealTime)
 
 res.status(200).json({
     message:"Done"
 
 })
 })
+const deleteChat = TryCatch(async(req,res,next)=>{
 
+    const chatId = req.params.id
+    console.log(chatId)
+
+    // const result = await db.transaction(async(tx)=>{
+    //     await tx 
+    //         .delete(message)
+    //         .where(eq(message.chatId,chatId))
+
+        
+    //     await tx 
+    //         .delete(chat)
+    //         .where(eq(chat.id,chatId))
+    // })
+    //! above is code for docker transaction as not supported in neon-http driver 
+
+    const result = await db.delete(message)
+                            .where(eq(message.chatId,chatId))
+    const chatResult= await db.delete(chat).where(eq(chat.id,chatId))
+
+console.log(result,chatResult)
+emitEvent(req,REFETECH_CHATS,[res.locals.userId],"refetch")
+
+    res.json({
+        success:true,
+        message:"deleted sucessfully"
+    })
+    })
 
 
 export {
+    deleteChat,
     SendAttachment,
     getChatDetails,
  getMyChats,

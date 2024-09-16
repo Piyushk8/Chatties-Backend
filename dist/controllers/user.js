@@ -21,8 +21,6 @@ const newUser = TryCatch(async (req, res, next) => {
         id: user.id,
         name: user.name
     });
-    // console.log(username,name,password,avatarContainer)
-    // console.log(newUser)
     sendToken(res, newUser[0], 200, "User created");
     // emitEvet(())
 });
@@ -36,7 +34,6 @@ const login = TryCatch(async (req, res, next) => {
     if (password != result?.password)
         return next(new ErrorHandler("Incorrect password", 403));
     sendToken(res, { id: result.id, name: result.name }, 200, "login success");
-    // await handleUserOnline(result.id);
 });
 const getMyDetails = TryCatch(async (req, res, next) => {
     const userId = res.locals.userId;
@@ -52,19 +49,32 @@ const getMyDetails = TryCatch(async (req, res, next) => {
         next(new ErrorHandler("no user found", 404));
     res.json({
         success: true,
-        user
+        user, isAuth: true
     });
 });
 const searchUser = TryCatch(async (req, res, next) => {
     const userId = res.locals.userId;
     const filterQuery = req?.query?.filter;
+    console.log(filterQuery);
     const users = await db.query.user.findMany({
         columns: { password: false },
-        where: (user, { ilike, ne }) => ilike(user.name, `%${filterQuery}%`) && ne(user.id, userId)
+        where: (user, { ilike, ne, and }) => and(ilike(user.name, `${filterQuery}%`), ne(user.id, userId))
     });
     return res.json({
         success: true,
         users
     });
 });
-export { newUser, login, searchUser, getMyDetails };
+const logout = TryCatch(async (req, res, next) => {
+    const userId = res.locals.userId;
+    console.log(userId);
+    return res.status(200).cookie("token", "", {
+        maxAge: 1000 * 60 * 60 * 24 * 15, sameSite: "none",
+        httpOnly: true,
+        secure: true
+    }).json({
+        message: "LoggetOut succesfully!",
+        success: true
+    });
+});
+export { logout, newUser, login, searchUser, getMyDetails };

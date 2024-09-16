@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getMyDetails, login, newUser, searchUser } from "../controllers/user.js";
+import { getMyDetails, login, logout, newUser, searchUser } from "../controllers/user.js";
 import { authMiddleware } from "../middlewares/auth.js";
 import { singleAvatar } from "../middlewares/multer.js";
 import { errorMiddleware } from "../middlewares/error.js";
@@ -13,8 +13,8 @@ userRouter.post("/login",login)
 
 userRouter.get("/search",authMiddleware,searchUser)
 userRouter.get("/me",authMiddleware,getMyDetails)
+userRouter.delete("/logout",authMiddleware,logout)
 userRouter.use(errorMiddleware)
-
 
 //get my profile 
 //search user
