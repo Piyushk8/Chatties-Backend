@@ -25,7 +25,7 @@ const io = new Server(server,{
     origin: [
       "http://localhost:5173",
       "http://localhost:4173",
-      //clienturl
+      process.env.CLIENT_URL||""
     ],
   
 methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

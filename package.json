@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "watch": "tsc -w",
     "dev": "nodemon --env-file=.env dist/app.js",
-    "start": "node dist/app.js",
+    "start": "node  --env-file=.env dist/app.js",
     "build": "tsc -b",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "npx tsx drizzle/db.ts"
