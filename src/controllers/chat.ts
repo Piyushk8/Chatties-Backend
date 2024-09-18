@@ -260,8 +260,11 @@ res.status(200).json({
 const deleteChat = TryCatch(async(req,res,next)=>{
 
     const chatId = req.params.id
-    console.log(chatId)
-
+    const otherMembers = await db.query.chatMembers.findMany({
+        where:(chatMembers,{eq})=>eq(chatMembers.chatId,chatId)
+    })
+    console.log(otherMembers)
+    const memberIds = otherMembers.map((i)=>i.userId) 
     // const result = await db.transaction(async(tx)=>{
     //     await tx 
     //         .delete(message)
@@ -273,13 +276,13 @@ const deleteChat = TryCatch(async(req,res,next)=>{
     //         .where(eq(chat.id,chatId))
     // })
     //! above is code for docker transaction as not supported in neon-http driver 
-
+    
     const result = await db.delete(message)
                             .where(eq(message.chatId,chatId))
     const chatResult= await db.delete(chat).where(eq(chat.id,chatId))
 
 console.log(result,chatResult)
-emitEvent(req,REFETECH_CHATS,[res.locals.userId],"refetch")
+emitEvent(req,REFETECH_CHATS,[...memberIds],"refetch")
 
     res.json({
         success:true,

@@ -1,4 +1,7 @@
 import Jwt from "jsonwebtoken";
+import { db } from "../drizzle/migrate.js";
+import { pinnedChats } from "../drizzle/schema.js";
+import { and, eq } from "drizzle-orm";
 const cookieOption = {
     maxAge: 1000 * 60 * 60 * 24,
     sameSite: 'none',
@@ -17,7 +20,25 @@ const sendToken = (res, user, code, message) => {
         message
     });
 };
-export { sendToken };
+const pinChat = async (chatId, userId, pinned, socketId) => {
+    console.log("pinhcat function", pinned, chatId, userId);
+    try {
+        if (pinned) {
+            //console.log("pinhcat started",chatId,userId)
+            const pinChats = await db.insert(pinnedChats).values({ chatId: chatId, userId: userId });
+            console.log("pinhcat compleeted");
+            console.log(pinChats);
+        }
+        else {
+            const pinChat = await db.delete(pinnedChats).where(and(eq(pinnedChats.userId, userId), eq(pinnedChats.chatId, chatId)));
+            console.log(pinChat);
+        }
+    }
+    catch (error) {
+        console.log(error);
+    }
+};
+export { sendToken, pinChat };
 // export async function handleUserOnline(userId: string) {
 //    console.log("Handleonlineuser")
 //     await db.update(user)

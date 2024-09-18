@@ -10,6 +10,7 @@ import { db } from "./drizzle/migrate.js";
 import { socketAuth } from "./middlewares/auth.js";
 import { chat, message as MessageSchema, user as userSchema } from "./drizzle/schema.js";
 import { eq } from "drizzle-orm";
+import { pinChat } from "./utils/feature.js";
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
@@ -62,15 +63,6 @@ io.on("connection", async (socket) => {
         //console.log(onlineUsers)
         io.emit(ONLINE_USER, { onlineUsers });
     }
-    //   socket.on("userLoggedIn", async ({user}) => {
-    //     console.log("log user",user)
-    //     if (user) {
-    //         await db.update(userSchema)
-    //             .set({ isOnline: true })
-    //             .where(eq(userSchema?.id, user.id));
-    //         io.emit("userStatusChange", {userId:user.id });
-    //     }
-    // });
     socket.on(NEW_MESSAGE, async ({ chatId, members, message }) => {
         //the message for real-time updates
         const messageForRealTime = {
@@ -130,6 +122,10 @@ io.on("connection", async (socket) => {
         const { members, chatId } = data;
         const userSockets = getSockets(members);
         socket.to(userSockets).emit(STOP_TYPING, { chatId });
+    });
+    socket.on("pinChat", ({ chatId, pinned, userId }) => {
+        //  console.log("pinned chat",userId,chatId)
+        pinChat(chatId, userId, pinned, socket?.id);
     });
     socket.on("disconnect", async () => {
         console.log(`${socket.id} disconencted`);

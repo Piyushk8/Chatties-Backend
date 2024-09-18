@@ -17,10 +17,12 @@ export const getSocketIds = (users = []) => {
     const sockets = users.map((user) => {
         return socketIds.get(user);
     });
+    console.log(sockets, users);
     return sockets;
 };
 export const emitEvent = (req, event, users, data) => {
     const userSockets = getSocketIds(users);
     const io = req.app.get("io");
+    console.log(event);
     io.to(userSockets).emit(event, data);
 };

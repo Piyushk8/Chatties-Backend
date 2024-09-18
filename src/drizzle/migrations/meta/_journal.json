@@ -50,6 +50,13 @@
       "when": 1724500909146,
       "tag": "0006_cheerful_vargas",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1726598173555,
+      "tag": "0007_same_captain_marvel",
+      "breakpoints": true
     }
   ]
 }

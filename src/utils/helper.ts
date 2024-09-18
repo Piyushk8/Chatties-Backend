@@ -27,12 +27,15 @@ export const getBase64 = (file:CloudinaryFile) => {
     // console.log(users,"users")
     const sockets =  users.map((user)=>{
       return socketIds.get(user)})
+      console.log(sockets,users)
     return sockets;
   }
 
 
   export const emitEvent=(req:Request,event:string,users:string[],data:unknown)=>{
+    
     const userSockets = getSocketIds(users);
     const io = req.app.get("io");
+    console.log(event)
     io.to(userSockets).emit(event,data)
   }

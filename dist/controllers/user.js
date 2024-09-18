@@ -37,19 +37,37 @@ const login = TryCatch(async (req, res, next) => {
 });
 const getMyDetails = TryCatch(async (req, res, next) => {
     const userId = res.locals.userId;
-    const user = await db.query.user.findFirst({
+    console.log("user");
+    const userDetail = await db.query.user.findFirst({
         where: (user, { eq }) => eq(user.id, userId),
         columns: {
             id: true,
             name: true,
             username: true
+        },
+        with: {
+            pinnedChats: {
+                columns: {
+                    chatId: true
+                }
+            }
         }
     });
-    if (!user)
+    if (!userDetail)
         next(new ErrorHandler("no user found", 404));
+    // const myPinnedChats = await db.query.pinnedChats.findMany({
+    //     where:(pinnedChats,{eq})=>eq(pinnedChats.userId,userId),
+    //     columns:{
+    //         chatId:true
+    //     }
+    // })
+    const pinnedChatIds = userDetail?.pinnedChats.map((i) => i.chatId);
+    console.log(userDetail);
     res.json({
+        // pinnedChats:myPinnedChats,
         success: true,
-        user, isAuth: true
+        pinnedChats: pinnedChatIds,
+        user: userDetail, isAuth: true
     });
 });
 const searchUser = TryCatch(async (req, res, next) => {

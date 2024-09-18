@@ -68,6 +68,7 @@ export const userRelations = relations(user, ({ many }) => ({
     chats: many(chatMembers, {
         relationName: "Chats"
     }),
+    pinnedChats: many(pinnedChats)
 }));
 // export const lastMessageAndChatRelation = relations(cha,({one})=>({
 //   sender: one(user, {
@@ -85,6 +86,12 @@ export const chatRelations = relations(chat, ({ many }) => ({
     }),
     message: many(message, {
         relationName: 'message'
+    }),
+}));
+export const pinnedChatsRelations = relations(pinnedChats, ({ one }) => ({
+    user: one(user, {
+        fields: [pinnedChats.userId],
+        references: [user.id]
     }),
 }));
 export const messageRelations = relations(message, ({ one }) => ({

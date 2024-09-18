@@ -15,6 +15,7 @@ import {chat, message as MessageSchema ,user as userSchema} from "./drizzle/sche
 import { getMyFriendsSockets } from "./utils/getMyFriendsSockets.js";
 import { eq } from "drizzle-orm";
 import { errorMiddleware } from "./middlewares/error.js";
+import { pinChat } from "./utils/feature.js";
 
 const app = express();
 const server = createServer(app)
@@ -80,15 +81,7 @@ io.on("connection", async(socket:CustomSocket )=>{
    //console.log(onlineUsers)
     io.emit(ONLINE_USER, {onlineUsers});
   }
-//   socket.on("userLoggedIn", async ({user}) => {
-//     console.log("log user",user)
-//     if (user) {
-//         await db.update(userSchema)
-//             .set({ isOnline: true })
-//             .where(eq(userSchema?.id, user.id));
-//         io.emit("userStatusChange", {userId:user.id });
-//     }
-// });
+
   
   socket.on(NEW_MESSAGE, async ({ chatId, members, message }) => {
     //the message for real-time updates
@@ -154,6 +147,11 @@ io.on("connection", async(socket:CustomSocket )=>{
     const userSockets = getSockets(members);
     socket.to(userSockets).emit(STOP_TYPING,{chatId})
   })
+  socket.on("pinChat",({chatId,pinned,userId})=>{
+    
+    //  console.log("pinned chat",userId,chatId)
+    pinChat(chatId,userId,pinned,socket?.id)}
+  )
 
 
   socket.on("disconnect", async()=>{
