@@ -20,36 +20,33 @@ import { pinChat } from "./utils/feature.js";
 const app = express();
 const server = createServer(app)
 
+const allowedOrigins =  [
+  "http://localhost:5173",
+  "http://localhost:4173",
+  process.env.CLIENT_URL||""
+].filter(Boolean)
+
 const io = new Server(server,{
   cors:{
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:4173",
-      process.env.CLIENT_URL||""
-    ],
-  
-methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization'],
-credentials: true}
+  origin:allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  //   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true}
 })
-
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser())
 app.use(cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:4173",
-    ],
+    origin: allowedOrigins,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true, 
+    optionsSuccessStatus: 204
+  }))
   
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      credentials: true, 
-      optionsSuccessStatus: 204
-    }))
-
-
-   export const socketIds = new Map();
-   export const onlineUsers = new Set(); 
+  
+  export const socketIds = new Map();
+  export const onlineUsers = new Set(); 
+  console.log(process.env.CLIENT_URL)
 
 
    app.use("/api/v1",mainRouter)
