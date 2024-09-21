@@ -96,10 +96,8 @@ const searchUser = TryCatch(async(req:Request,
     res:Response,
     next:NextFunction
 )=>{
-    const userId  = res.locals.userId;
-    
+   const userId  = res.locals.userId;
    const filterQuery = req?.query?.filter
-    console.log(filterQuery)
    const users = await db.query.user.findMany({
     columns:{password:false},
     where:(user,{ilike,ne,and})=>and( ilike(user.name ,`${filterQuery}%`) ,ne(user.id,userId))

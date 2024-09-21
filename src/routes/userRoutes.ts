@@ -16,7 +16,5 @@ userRouter.get("/me",authMiddleware,getMyDetails)
 userRouter.delete("/logout",authMiddleware,logout)
 userRouter.use(errorMiddleware)
 
-//get my profile 
-//search user
-//logout
+
 export {userRouter}

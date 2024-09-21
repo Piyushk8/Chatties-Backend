@@ -8,7 +8,7 @@ export const errorMiddleware=(err:ErrorHandler
     res:Response,
     next:NextFunction
 )=>{
-    console.log("here",err)
+  
     err.message||=""
     return res.status(err.statusCode).json({
         success:false,

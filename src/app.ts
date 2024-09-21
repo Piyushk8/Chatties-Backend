@@ -46,7 +46,7 @@ app.use(cors({
   
   export const socketIds = new Map();
   export const onlineUsers = new Set(); 
-  console.log(process.env.CLIENT_URL)
+
 
 
    app.use("/api/v1",mainRouter)
@@ -161,7 +161,6 @@ io.on("connection", async(socket:CustomSocket )=>{
         .set({isOnline:false})
         .where(eq(userSchema?.id,user.id))
         const onlineUsers = await getOnlineUsers();
-        console.log(onlineUsers)
         io.emit("userStatusChange",{userId:user.id})
       }
 

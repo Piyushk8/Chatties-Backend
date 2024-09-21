@@ -80,7 +80,7 @@ const createChat = TryCatch(async(req,res,next)=>{
         userId:userId
     })
     emitEvent(
-        req,REFETECH_CHATS,[userId,myId],""
+        req,REFETECH_CHATS,[userId,myId],false
     )
      return res.status(200).json({
         success:true,
@@ -92,12 +92,14 @@ const createChat = TryCatch(async(req,res,next)=>{
 })
 const getChatDetails = TryCatch(async (req, res, next) => {
     const chatId = req.params.id;
-    // console.log(chatId)
-    // console.log(res.locals.userId)
+    
     const chatName = await db.query.chat.findFirst({
         where:(chat,{eq})=>eq(chat.id,chatId),
         columns:{chatname:true}
     })
+    console.log(chatName)
+    if(!chatName) return next(new ErrorHandler("no chat found",404))
+        
     const members = await db.query.chatMembers.findMany({
         where:(chatMembers,{eq,ne,and})=> and(eq(chatMembers.chatId,chatId) ,ne(chatMembers.userId,res.locals.userId)  ) ,
         with:{
@@ -118,17 +120,17 @@ const getChatDetails = TryCatch(async (req, res, next) => {
 });
 
 const getMyChats= TryCatch(async(req,res,next)=>{
-    const userId = res.locals.userId;
+    const userId = res.locals.userId || req.body.userId;
 
     const myChats = await db.query.chatMembers.findMany({
         where:(chatMembers,{eq})=>eq(chatMembers.userId,userId),
        columns:{chatId:true}
     })
-
+   
     const chatIds = myChats.map((chat)=>chat.chatId)
     
     const transformedChat = await db.query.chatMembers.findMany({
-        where:(chatMembers,{inArray,ne})=> inArray(chatMembers.chatId,chatIds) && ne(chatMembers.userId,userId),
+        where:(chatMembers,{inArray,ne,and})=>and(inArray(chatMembers.chatId,chatIds) , ne(chatMembers.userId,userId)),
         with:{
             user:{
                 columns:{
@@ -142,12 +144,7 @@ const getMyChats= TryCatch(async(req,res,next)=>{
             }
         }
     })
-    // const pinnedChats = await db.query.pinnedChats.findMany({
-    //     where:(pinnedChats,{eq})=>eq(pinnedChats.userId,userId),
-        
-    // })
-    
-    
+
     res.status(200).json({
         success:true,
         transformedChat
@@ -263,7 +260,6 @@ const deleteChat = TryCatch(async(req,res,next)=>{
     const otherMembers = await db.query.chatMembers.findMany({
         where:(chatMembers,{eq})=>eq(chatMembers.chatId,chatId)
     })
-    console.log(otherMembers)
     const memberIds = otherMembers.map((i)=>i.userId) 
     // const result = await db.transaction(async(tx)=>{
     //     await tx 
@@ -281,8 +277,7 @@ const deleteChat = TryCatch(async(req,res,next)=>{
                             .where(eq(message.chatId,chatId))
     const chatResult= await db.delete(chat).where(eq(chat.id,chatId))
 
-console.log(result,chatResult)
-emitEvent(req,REFETECH_CHATS,[...memberIds],"refetch")
+emitEvent(req,REFETECH_CHATS,[...memberIds],"delete")
 
     res.json({
         success:true,
