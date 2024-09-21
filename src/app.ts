@@ -48,7 +48,9 @@ app.use(cors({
   export const onlineUsers = new Set(); 
 
 
-
+    app.get("/",(req,res,next)=>{
+      res.send("hello server pingged")
+    })
    app.use("/api/v1",mainRouter)
    app.set("io",io);
    io.use(socketAuth);
