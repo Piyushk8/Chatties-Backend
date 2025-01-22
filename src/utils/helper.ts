@@ -1,5 +1,5 @@
 import { Request } from "express";
-import { socketIds } from "../app.js";
+import { redisService, socketService } from "../app.js";
 import { CloudinaryFile } from "../types/types.js";
 
 export const getBase64 = (file:CloudinaryFile) => {
@@ -17,25 +17,16 @@ export const getBase64 = (file:CloudinaryFile) => {
     }
   }
 
-  export const getSockets =(users:userType[]=[])=>{
-    // console.log(users,"users")
-    const sockets =  users.map((user:userType)=>{
-      return socketIds.get(user?.user.id)})
-    return sockets;
-  }
-  export const getSocketIds =(users:string[]=[])=>{
-    // console.log(users,"users")
-    const sockets =  users.map((user)=>{
-      return socketIds.get(user)})
-      console.log(sockets,users)
-    return sockets;
+  export const getSocketIds =async (users:string[]=[])=>{
+  const redisClient =  redisService.getClient()
+  const sockets = await redisClient.hmget("user:sockets",...users)
+  const socketIds = sockets.filter((s)=>s!==null)
+  return socketIds
   }
 
 
-  export const emitEvent=(req:Request,event:string,users:string[],data:unknown)=>{
-    
-    const userSockets = getSocketIds(users);
-    const io = req.app.get("io");
-    console.log(event)
+  export const emitEvent=async(req:Request,event:string,users:string[],data:unknown)=>{
+    const userSockets = await getSocketIds(users);
+    const io = socketService["io"] 
     io.to(userSockets).emit(event,data)
   }

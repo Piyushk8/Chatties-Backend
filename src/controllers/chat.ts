@@ -97,7 +97,6 @@ const getChatDetails = TryCatch(async (req, res, next) => {
         where:(chat,{eq})=>eq(chat.id,chatId),
         columns:{chatname:true}
     })
-    console.log(chatName)
     if(!chatName) return next(new ErrorHandler("no chat found",404))
         
     const members = await db.query.chatMembers.findMany({
@@ -112,7 +111,6 @@ const getChatDetails = TryCatch(async (req, res, next) => {
             }
         },
     })
-     //console.log(members);
     res.status(200).json({
         success: true,
         members
