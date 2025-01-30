@@ -10,7 +10,7 @@ export const errorMiddleware=(err:ErrorHandler
 )=>{
   
     err.message||=""
-    return res.status(err.statusCode).json({
+    return res.status(err.statusCode||500).json({
         success:false,
         message:err.message
     })

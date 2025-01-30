@@ -31,7 +31,6 @@ async function authenticateUser(tokenBearer: string): Promise<{id:string, name:s
       const decodedToken  = jwt.verify(token,"JSON_SECRET")
       
       const user = decodedToken as JwtPayload
-     
       return {id:user.id , name:user.name}
     }
     return null;
