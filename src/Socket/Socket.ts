@@ -157,12 +157,13 @@ export class SocketService {
 
     try {
       // First store the current socket's group mappings for cleanup
-      pipeline.sadd(`socket:${socketId}:groups`, ...groupIds);
+      // pipeline.sadd(`socket:${socketId}:groups`, ...groupIds);
+      pipeline.sadd(`socket:${userId}:groups`, ...groupIds);
       pipeline.expire(`socket:${socketId}:groups`, 24 * 60 * 60);
 
       // Then add to all groups
       for (const groupId of groupIds) {
-        pipeline.sadd(`group:${groupId}:members`, socketId);
+        pipeline.sadd(`group:${groupId}:members`, userId);
         pipeline.expire(`group:${groupId}:members`, 24 * 60 * 60);
       }
 
@@ -176,6 +177,7 @@ export class SocketService {
   //remove user's socketId from its group set
   private async removeGroupMemberSocket(
     socketId: string,
+    userId:string,
     groupIds: string[] | undefined
   ) {
     if (!groupIds?.length) return;
@@ -185,17 +187,17 @@ export class SocketService {
     try {
       // Get additional groups this socket might be part of
       const socketGroups = await redisClient.smembers(
-        `socket:${socketId}:groups`
+        `socket:${userId}:groups`
       );
       const allGroupIds = [...new Set([...groupIds, ...socketGroups])];
 
       // Remove socket from all groups
       for (const groupId of allGroupIds) {
-        pipeline.srem(`group:${groupId}:members`, socketId);
+        pipeline.srem(`group:${groupId}:members`,userId);
       }
 
       // Clean up socket's group mapping
-      pipeline.del(`socket:${socketId}:groups`);
+      pipeline.del(`socket:${userId}:groups`);
 
       console.log("removing socket", socketId, allGroupIds);
       await pipeline.exec();
@@ -567,7 +569,6 @@ export class SocketService {
       });
       //Mark as read
       socket.on(MARK_MESSAGES_READ, async (data, callback) => {
-        console.log("message read complete");
         await this.handleMarkMessagesRead(socket, data, false);
         callback({ success: true, timestamp: new Date() });
       });
@@ -599,17 +600,14 @@ export class SocketService {
         "pinChat",
         async ({ pinned, isGroup, groupId, userId, chatId }) => {
           try {
-            console.log(pinned, isGroup, groupId, userId, chatId);
             if (!userId) return;
             if (pinned === true) {
-              console.log("here");
               const res = await db.insert(pinnedChats).values({
                 userId: userId,
                 groupId: isGroup ? groupId : null,
                 type: isGroup ? PinType.GROUP : PinType.CHAT,
                 chatId: !isGroup ? chatId : null,
               });
-              console.log(res);
               return;
             }
             await db
@@ -638,7 +636,6 @@ export class SocketService {
         async ({ mute, groupId, isGroup, userId, chatId }) => {
           try {
             if (!userId) return;
-            console.log(mute, chatId, userId);
             if (mute === true) {
               const res = await db.insert(mutedChats).values({
                 userId: userId,
@@ -646,7 +643,6 @@ export class SocketService {
                 type: isGroup ? PinType.GROUP : PinType.CHAT,
                 chatId: !isGroup ? chatId : null,
               });
-              console.log(res);
             }
             return await db
               .delete(mutedChats)
@@ -686,6 +682,7 @@ export class SocketService {
               // Remove socket from all groups
               this.removeGroupMemberSocket(
                 socket.id,
+                user?.id,
                 userGroups?.map((g: { groupId: string }) => g?.groupId)
               ),
             ]);
