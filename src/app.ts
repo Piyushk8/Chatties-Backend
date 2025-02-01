@@ -37,7 +37,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/v1", mainRouter)
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3000
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`)
 })
