@@ -10,8 +10,7 @@
     "start": "node  dist/app.js",
     "build": "tsc -b",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
-    "db:migrate": "npx tsx drizzle/db.ts",
-    "postinstall": "npm install --save-dev"
+    "db:migrate": "npx tsx drizzle/db.ts"
   },
   "keywords": [],
   "author": "",
