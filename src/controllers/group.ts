@@ -73,8 +73,7 @@ const createGroup = TryCatch(async (req, res, next) => {
 const getMyGroups = TryCatch(async (req, res, next) => {
   //MY userid
   const myId = res.locals.userId;
-  console.log(myId)
-  const myGroups = await db.query.groupMembers.findMany({
+  const Groups = await db.query.groupMembers.findMany({
     where: (groupMembers, { eq }) => eq(groupMembers.userId, myId),
     with: {
       group: {
@@ -87,8 +86,12 @@ const getMyGroups = TryCatch(async (req, res, next) => {
         },
       },
     },
+    columns:{
+      unreadCount:true
+    }
   });
-
+   const myGroups =  Groups.map((g)=> ({group:{...g.group,unreadCount:g.unreadCount}}))
+  
   return res.status(200).json({
     success: true,
     myGroups,
@@ -199,13 +202,13 @@ const getGroupMessages = TryCatch(async (req, res, next) => {
 });
 
 const SendAttachment = TryCatch(
-  async (req: Request<{}, {}, { chatId: string }>, res: Response, next) => {
-    const { chatId } = req.body;
-    const chat = await db.query.chat.findFirst({
-      where: (chat, { eq }) => eq(chat.id, chatId),
+  async (req: Request<{}, {}, { groupId: string }>, res: Response, next) => {
+    const { groupId } = req.body;
+    const group = await db.query.group.findFirst({
+      where: (group, { eq }) => eq(group.id, groupId),
     });
-    const members = await db.query.chatMembers.findMany({
-      where: (chatMembers, { eq }) => eq(chatMembers.chatId, chatId),
+    const members = await db.query.groupMembers.findMany({
+      where: (groupMembers, { eq }) => eq(groupMembers.groupId, groupId),
       columns: {
         userId: true,
       },
@@ -213,20 +216,20 @@ const SendAttachment = TryCatch(
     const me = await db.query.user.findFirst({
       where: (user, { eq }) => eq(user.id, res.locals.userId),
     });
+
     if (!me) return next(new ErrorHandler("Sender Not valid", 403));
-    if (!chat) return next(new ErrorHandler("chat not found", 404));
+    if (!group) return next(new ErrorHandler("group not found", 404));
 
     const files: CloudinaryFile[] = req.files as CloudinaryFile[];
     if (!files || files.length === 0) {
       return next(new Error("No files provided"));
     }
     const cloudinaryUrls = await uploadToCloudinary(files);
-
     const messageForDb = {
       content: "",
       sender: me?.id,
       attachment: cloudinaryUrls,
-      chatId: chatId,
+      groupId: groupId,
     };
     const messageForRealTime = {
       ...messageForDb,
@@ -236,7 +239,7 @@ const SendAttachment = TryCatch(
         avatar: me?.avatar,
       },
     };
-    const result = await db.insert(message).values(messageForDb);
+    const result = await db.insert(groupMessages).values(messageForDb);
 
     const membersId = members.map((i) => i.userId);
     //!emitevent new message || new message Alert
@@ -453,4 +456,7 @@ export {
   getGroupDetails,
   kickMember,
   joinGroup,
+  SendAttachment
 };
+
+

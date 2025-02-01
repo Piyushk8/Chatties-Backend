@@ -20,6 +20,7 @@ import { and, eq, ne, or, sql } from "drizzle-orm";
 import {
   InitialUsersStatus,
   IS_TYPING,
+  MARK_GROUP_MESSAGES_READ,
   MARK_MESSAGES_READ,
   NEW_GROUP_MESSAGE,
   NEW_MESSAGE,
@@ -246,6 +247,18 @@ export class SocketService {
 
       // Send feedback to sender
       socket.emit(NEW_GROUP_MESSAGE, messageData);
+      const unreadCountData = await db
+        .update(groupMembers)
+        .set({
+          unreadCount: sql`${groupMembers?.unreadCount} + 1`,
+        })
+        .where(
+          and(
+            eq(groupMembers?.groupId, groupId),
+            ne(groupMembers?.userId, user?.id)
+          )
+        )
+        .returning({ unreadCount: groupMembers?.unreadCount });
 
       // Store in database first
       const result = await db.insert(groupMessages).values({
@@ -270,6 +283,7 @@ export class SocketService {
         "group:messages",
         JSON.stringify({
           groupId,
+          unreadCountData,
           socketId: socket.id,
           message: messageData,
         })
@@ -294,6 +308,8 @@ export class SocketService {
         createdAt: new Date().toISOString(),
       };
 
+      socket.emit(NEW_MESSAGE, messageData);
+
       //unread message count
       const unreadCountData = await db
         .update(chatMembers)
@@ -309,7 +325,6 @@ export class SocketService {
         .returning({ unreadCount: chatMembers?.unreadCount });
 
       //send realtime feedback to user
-      socket.emit(NEW_MESSAGE, messageData);
       // Store message in Redis for real-time delivery
       await this.redisService.getPublisher().publish(
         "chat:messages",
@@ -342,81 +357,42 @@ export class SocketService {
     }
   }
 
-  private async handleMarkMessagesRead(socket: CustomSocket, data: any) {
+  private async handleMarkMessagesRead(
+    socket: CustomSocket,
+    data: any,
+    isGroup: boolean
+  ) {
     const user = socket.user;
-    const { chatId, userId } = data;
+    const { chatId, userId, groupId } = data;
     if (!user?.id) return;
 
     try {
       // Reset unread count in database
-      const res = await db
-        .update(chatMembers)
-        .set({ unreadCount: 0 })
+      if (!isGroup) {
+        const res = await db
+          .update(chatMembers)
+          .set({ unreadCount: 0 })
+          .where(
+            and(eq(chatMembers?.chatId, chatId), ne(chatMembers.userId, userId))
+          );
+        return;
+      }
+
+      await db
+        .update(groupMembers)
+        .set({
+          unreadCount: 0,
+        })
         .where(
-          and(eq(chatMembers?.chatId, chatId), ne(chatMembers.userId, userId))
+          and(
+            ne(groupMembers?.userId, userId),
+            eq(groupMembers?.groupId, groupId)
+          )
         );
-      // Emit to all members that messages were read
-      // this.io.to(memberSockets).emit(UNREAD_COUNT_UPDATE, {
-      //     chatId,
-      //     userId: user?.id,
-      //     unreadCount: 0
-      // });
     } catch (error) {
       console.error("Error marking messages as read:", error);
     }
   }
-
-  //group handlers
-  // private async handleGroupMessage(socket: CustomSocket, data: any) {
-  //   console.log("handling",data)
-  //   const user = socket.user;
-  //   const { groupId, members, message } = data;
-  //   if(!user) return;
-  //   try {
-  //     // Prepare message data
-  //     const messageData = {
-  //       content: message,
-  //       sender: user,
-  //       groupId: groupId,
-  //       createdAt: new Date().toISOString(),
-  //     };
-
-  //     // Send realtime feedback to sender
-  //     socket.emit(NEW_GROUP_MESSAGE, messageData);
-
-  //     // Publish to Redis for real-time delivery
-  //     await this.redisService.getPublisher().publish(
-  //       "group:messages",
-  //       JSON.stringify({
-  //         groupId,
-  //         message: messageData,
-  //         members,
-  //       })
-  //     );
-
-  //     // Store in database
-  //     const result = await db.insert(groupMessages).values({
-  //       content: message,
-  //       sender: user?.id,
-  //       groupId: groupId,
-  //     });
-
-  //     // Update group's last message
-  //     if (result) {
-  //       await db
-  //         .update(group)
-  //         .set({
-  //           lastMessage: message,
-  //           lastSent: new Date(),
-  //           // unreadCount: sql`unreadCount + 1`
-  //         })
-  //         .where(eq(group.id, groupId));
-  //     }
-  //   } catch (error) {
-  //     socket.emit("MESSAGE_ERROR", error);
-  //     console.error("Error handling group message:", error);
-  //   }
-  // }
 
   // private async handleGroupTyping(socket: CustomSocket, data: any) {
   //   const { groupId, members } = data;
@@ -537,7 +513,10 @@ export class SocketService {
                   .hget("user:sockets", member);
               })
             );
-            this.io.to(sockets).emit(STOP_TYPING, data);
+            data?.isTyping
+              ? this.io.to(sockets).emit(IS_TYPING, data)
+              : this.io.to(sockets).emit(STOP_TYPING, data);
+
           } catch (error) {
             console.log("error subscribing to typing");
           }
@@ -589,7 +568,11 @@ export class SocketService {
       //Mark as read
       socket.on(MARK_MESSAGES_READ, async (data, callback) => {
         console.log("message read complete");
-        await this.handleMarkMessagesRead(socket, data);
+        await this.handleMarkMessagesRead(socket, data, false);
+        callback({ success: true, timestamp: new Date() });
+      });
+      socket.on(MARK_GROUP_MESSAGES_READ, async (data, callback) => {
+        await this.handleMarkMessagesRead(socket, data, true);
         callback({ success: true, timestamp: new Date() });
       });
 
@@ -612,66 +595,73 @@ export class SocketService {
       });
 
       //PINCHATS
-      socket.on("pinChat", async ({ pinned,isGroup, groupId,userId, chatId }) => {
-        try {
-          console.log( pinned,isGroup, groupId,userId, chatId)
-          if (!userId ) return;
-          if (pinned === true) {
-            console.log("here")
-            const res = await db.insert(pinnedChats).values({
-              userId: userId,
-              groupId: isGroup ? groupId:null,
-              type:isGroup ? PinType.GROUP:PinType.CHAT,
-              chatId:!isGroup ? chatId : null,
-            });
-            console.log(res)
+      socket.on(
+        "pinChat",
+        async ({ pinned, isGroup, groupId, userId, chatId }) => {
+          try {
+            console.log(pinned, isGroup, groupId, userId, chatId);
+            if (!userId) return;
+            if (pinned === true) {
+              console.log("here");
+              const res = await db.insert(pinnedChats).values({
+                userId: userId,
+                groupId: isGroup ? groupId : null,
+                type: isGroup ? PinType.GROUP : PinType.CHAT,
+                chatId: !isGroup ? chatId : null,
+              });
+              console.log(res);
+              return;
+            }
+            await db
+              .delete(pinnedChats)
+              .where(
+                or(
+                  and(
+                    eq(pinnedChats.userId, userId),
+                    eq(pinnedChats.chatId, chatId)
+                  ),
+                  and(
+                    eq(pinnedChats.userId, userId),
+                    eq(pinnedChats.groupId, groupId)
+                  )
+                )
+              );
+            return;
+          } catch (error) {
+            console.log(error);
             return;
           }
-          await db
-            .delete(pinnedChats)
-            .where(
-              or(and(
-                eq(pinnedChats.userId, userId),
-                eq(pinnedChats.chatId, chatId)
-              ),
-              and(
-                eq(pinnedChats.userId, userId),
-                eq(pinnedChats.groupId, groupId)
-              ))
-            );
-            return
-        } catch (error) {
-          console.log(error)
-          return;
         }
-      });
-      socket.on("MUTECHAT", async ({mute, groupId,isGroup,userId, chatId }) => {
-        try {
-          if (!userId) return;
-          console.log(mute,chatId,userId)
-          if (mute === true) {
-            const res = await db.insert(mutedChats).values({
-              userId: userId,
-              groupId: isGroup ? groupId:null,
-              type:isGroup ? PinType.GROUP:PinType.CHAT,
-              chatId:!isGroup ? chatId : null,
-            });
-            console.log(res)
-
+      );
+      socket.on(
+        "MUTECHAT",
+        async ({ mute, groupId, isGroup, userId, chatId }) => {
+          try {
+            if (!userId) return;
+            console.log(mute, chatId, userId);
+            if (mute === true) {
+              const res = await db.insert(mutedChats).values({
+                userId: userId,
+                groupId: isGroup ? groupId : null,
+                type: isGroup ? PinType.GROUP : PinType.CHAT,
+                chatId: !isGroup ? chatId : null,
+              });
+              console.log(res);
+            }
+            return await db
+              .delete(mutedChats)
+              .where(
+                and(
+                  eq(mutedChats.userId, userId),
+                  eq(mutedChats.chatId, chatId)
+                )
+              );
+          } catch (error) {
+            console.log(error);
+            return;
           }
-          return await db
-            .delete(mutedChats)
-            .where(
-              and(
-                eq(mutedChats.userId, userId),
-                eq(mutedChats.chatId, chatId)
-              )
-            );
-        } catch (error) {
-          console.log(error)
-          return;
         }
-      });
+      );
 
       // Handle disconnection
       socket.on("disconnect", async () => {

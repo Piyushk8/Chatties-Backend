@@ -4,10 +4,10 @@ import { neon } from '@neondatabase/serverless';
 import { config } from 'dotenv';
 
 const result = config({ path: '../.env' }); // or .env.local
-//console.log("DATABASE_URL_db.ts:", process.env.DATABASE_URL);
+console.log("DATABASE_URL_db.ts:", process.env.DATABASE_URL);
 const sql = neon(process.env.DATABASE_URL!);
 export const db = drizzle(sql);
-
+console.log("db",db ,"sql", sql)
 async function main() {
   console.log('Running migrations...');  
   await migrate(db, { migrationsFolder: './drizzle/migrations' 
