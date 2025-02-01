@@ -1,7 +1,17 @@
 import { NextFunction, Request, Response } from "express";
-import { chat, chatMembers, message, user } from "../drizzle/schema.js";
-import {  Multer } from 'multer'; 
 import { Socket } from "socket.io";
+
+declare global {
+  namespace Express {
+    interface Request {
+      file?: Express.Multer.File;
+      files?: { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[];
+    }
+  }
+}
+
+
+
 export interface newUserRequestBody {
     name:string,
     username:string,
@@ -20,6 +30,9 @@ export type ControllerType = (req: Request,
 
 export interface CloudinaryFile extends Express.Multer.File {
     buffer: Buffer;
+    mimetype: string;
+    path: string;
+    filename: string;
   }
 
 

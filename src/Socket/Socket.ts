@@ -166,8 +166,6 @@ export class SocketService {
         pipeline.sadd(`group:${groupId}:members`, userId);
         pipeline.expire(`group:${groupId}:members`, 24 * 60 * 60);
       }
-
-      console.log("updating groups", socketId, groupIds, userId);
       await pipeline.exec();
     } catch (error) {
       console.error("Error updating group member socket:", error);
@@ -198,8 +196,6 @@ export class SocketService {
 
       // Clean up socket's group mapping
       pipeline.del(`socket:${userId}:groups`);
-
-      console.log("removing socket", socketId, allGroupIds);
       await pipeline.exec();
     } catch (error) {
       console.error("Error removing socket from groups:", error);
@@ -481,7 +477,6 @@ export class SocketService {
               // Get sender's socket ID to exclude it
 
               if (socketId) {
-                // Remove sender's socket ID from the list of recipients
                 const recipientSocketIds = activeSocketIds.filter(
                   (id) => id !== socketId
                 );
@@ -504,7 +499,6 @@ export class SocketService {
             console.error("Error broadcasting group message:", error);
             // No error recovery mechanism
           }
-        // ... other cases
 
         case "typing:status":
           try {
