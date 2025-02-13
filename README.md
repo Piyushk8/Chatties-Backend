@@ -1,7 +1,6 @@
 # Chatties - Real-Time Chat App
 
-
-Chatties is a scalable and feature-rich real-time chat application built with **PERN Stack (PostgreSQL, Express, React, Node.js)** and **Drizzle ORM**. It leverages **Redis Pub/Sub** to ensure smooth and efficient real-time messaging across multiple instances. The app includes essential chat functionalities such as online status, message alerts, group chats, file uploads, and a fully responsive UI with light/dark mode.
+Chatties is a scalable and feature-rich real-time chat application built with **PERN Stack (PostgreSQL, Express, React, Node.js)** and **Drizzle ORM**. It leverages **Redis Pub/Sub** and **Kafka** to ensure smooth and efficient real-time messaging across multiple instances. The app includes essential chat functionalities such as online status, message alerts, group chats, file uploads, and a fully responsive UI with light/dark mode.
 
 ---
 
@@ -19,17 +18,16 @@ Chatties is a scalable and feature-rich real-time chat application built with **
 
 ### 🔹 Scalability & Performance
 - **Redis Pub/Sub** for multi-instance synchronization
+- **Kafka Integration** for high-throughput message processing
 - **Drizzle ORM** for efficient database handling
 - Optimized queries for high-speed data retrieval
 
 ### 🔹 Online Presence & Notifications
 - Live user status (Online/Offline)
-- Real-time notifications for messages & mentions
-- System-wide announcements
+- Real-time notifications for messages
 
 ### 🔹 Multimedia & File Sharing
 - Image, video, and document uploads
-- Cloud storage integration (Optional: AWS S3, Firebase Storage, etc.)
 - Drag & drop support for easy file sharing
 
 ### 🔹 UI & Accessibility
@@ -55,13 +53,30 @@ Chatties is a scalable and feature-rich real-time chat application built with **
 - Node.js + Express.js
 - PostgreSQL (Drizzle ORM for database management)
 - Redis for caching and Pub/Sub messaging
+- Kafka for message queue management
 - Socket.io for real-time communication
 
 ### **Deployment & DevOps:**
-- Docker for containerization
-- Vercel/Render for frontend hosting
-- Railway/NeonDB for database hosting
+- Vercel for frontend hosting
+- NeonDB for database hosting
 - CI/CD integration with GitHub Actions
+-render for backend
+---
+
+## 🔧 Kafka-Based Consumer Implementation
+
+### 🔹 Unified Kafka Consumer for Chat & Group Messages
+Chatties now utilizes a **single Kafka consumer** that subscribes to both `chat-messages` and `group-messages` topics, ensuring efficient processing without redundant subscriptions. The consumer:
+- Listens to messages from both **chat and group topics**.
+- **Processes** messages and updates the database accordingly.
+- Publishes updates to Redis for **real-time UI updates**.
+- Efficiently **increments unread message count** for other users.
+
+### 🔹 Benefits of Kafka Integration
+- **Scalability:** Handles large volumes of messages seamlessly.
+- **Fault Tolerance:** Ensures messages are processed even if an instance fails.
+- **Decoupled Architecture:** Allows independent scaling of consumers and producers.
+- **Optimized Database Writes:** Reduces redundant queries, improving performance.
 
 ---
 
@@ -82,6 +97,7 @@ Chatties is a scalable and feature-rich real-time chat application built with **
    ```env
    DATABASE_URL=your_postgresql_url
    REDIS_URL=your_redis_url
+   KAFKA_BROKER=your_kafka_broker_url
    JWT_SECRET=your_jwt_secret
    ```
 
@@ -91,23 +107,36 @@ Chatties is a scalable and feature-rich real-time chat application built with **
    npm run dev
    ```
 
-5. **Start the frontend app:**
+5. **Start the Kafka consumer:**
+   ```bash
+   npm run consume
+   ```
+
+6. **Start the frontend app:**
    ```bash
    cd client
    npm run dev
    ```
 
-6. **Access the application:**
+7. **Access the application:**
    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 📌 Roadmap
+## 📌 Future Scope
 
-- [ ] Implement end-to-end encryption for private chats
-- [ ] Add video/audio call functionality
-- [ ] Improve admin panel for user management
-- [ ] Support push notifications (Web & Mobile)
+### 🔹 **Enhanced Real-Time Communication**
+- **End-to-End Encryption** for private chats to enhance security.
+- **Video & Voice Calls** using WebRTC for real-time audio/video communication.
+
+### 🔹 **Improved User Experience**
+- AI-based **smart reply suggestions**.
+- **Push Notifications** for web & mobile alerts.
+
+### 🔹 **Advanced Analytics & Moderation**
+- **Admin Dashboard** for chat moderation and user management.
+- **Sentiment Analysis** for content moderation.
+- **Message Auditing** for compliance and security.
 
 ---
 
