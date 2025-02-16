@@ -251,6 +251,7 @@ export const groupMessages = pgTable(
     lastSent: timestamp("lastSent")
       .defaultNow()
       .$onUpdate(() => new Date()),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
   },
   (table) => {
     return {

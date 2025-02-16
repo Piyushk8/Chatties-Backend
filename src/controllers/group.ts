@@ -108,7 +108,7 @@ const getGroupDetails = TryCatch(async (req, res, next) => {
 
   const groupDetails = await db.query.group.findFirst({
     where: (chat, { eq }) => eq(chat.id, groupId),
-    columns: { groupname: true, groupImage: true, groupType: true },
+    columns: { groupname: true, groupImage: true, groupType: true ,id:true},
   });
   if (!groupDetails) return next(new ErrorHandler("no chat found", 404));
 
@@ -198,6 +198,31 @@ const getGroupMessages = TryCatch(async (req, res, next) => {
     messages,
     totalMessages,
     totalPages: Math.ceil(totalMessages / limit),
+  });
+});
+const getGroupAttachments = TryCatch(async (req, res, next) => {
+  const groupId = req.params.id;
+  // console.log(chatId, "get messages");
+  const result = await db.query.groupMessages.findMany({
+    where: (groupMessages, { eq ,and,isNotNull}) => and(eq(groupMessages?.groupId,groupId),isNotNull(groupMessages?.attachment)),
+    orderBy: (groupMessages, { desc }) => [desc(groupMessages.lastSent)],
+    with: {
+      sender: {
+        columns: {
+          id:true,
+          name: true,
+          avatar: true,
+          username: true,
+          isOnline: true,
+        },
+      },
+    },
+  });
+  // Return the messages as a JSON response
+  const attachments = result.reverse();
+
+  return res.json({
+    attachments,
   });
 });
 
@@ -446,6 +471,7 @@ const deleteMessage = TryCatch(async (req, res, next) => {
 });
 
 export {
+  getGroupAttachments,
   deleteMessage,
   deleteGroup,
   exitGroup,

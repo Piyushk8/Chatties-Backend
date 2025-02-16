@@ -1,1 +1,0 @@
-ALTER TABLE "chat" ADD COLUMN "unread" boolean;

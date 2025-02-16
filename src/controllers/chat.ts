@@ -212,6 +212,26 @@ const getMessages = TryCatch(async (req, res, next) => {
     totalPages: Math.ceil(totalMessages / limit),
   });
 });
+const getAttachments = TryCatch(async (req, res, next) => {
+  const chatId = req.params.id;
+  console.log(chatId, "get messages");
+
+  
+  const result = await db.query.message.findMany({
+    where: (message, { eq ,and,isNotNull}) => and(eq(message.chatId, chatId),isNotNull(message?.attachment)),
+    orderBy: (message, { desc }) => [desc(message.createdAt)],
+    with: {
+      sender: true,
+    },
+  });
+
+  // Return the messages as a JSON response
+  const attachments = result.reverse();
+
+  return res.json({
+    attachments,
+  });
+});
 
 const SendAttachment = TryCatch(
   async (req: Request<{}, {}, { chatId: string }>, res: Response, next) => {
@@ -305,4 +325,5 @@ export {
   sendMessage,
   createChat,
   getMessages,
+  getAttachments
 };
