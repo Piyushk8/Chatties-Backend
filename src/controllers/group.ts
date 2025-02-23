@@ -1,4 +1,4 @@
-import { and, count, eq, exists } from "drizzle-orm";
+import { and, count, eq, exists, sql } from "drizzle-orm";
 import { db } from "../drizzle/migrate.js";
 import { TryCatch } from "../middlewares/error.js";
 import ErrorHandler from "../utils/utility.js";
@@ -21,8 +21,9 @@ import "dotenv";
 import { config } from "dotenv";
 import { emitEvent, getBase64 } from "../utils/helper.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import {
+  NEW_GROUP_MESSAGE,
   NEW_MESSAGE,
   NEW_MESSAGE_ALERT,
   REFETECH_CHATS,
@@ -38,7 +39,8 @@ cloudinary.config({
 const createGroup = TryCatch(async (req, res, next) => {
   //MY userid
   const myId = res.locals.userId;
-  const { groupName, groupType } = req.body;
+  const { groupName, isPrivate } = req.body;
+  // console.log(req)
 
   const file = req.file as CloudinaryFile;
   let url: string[] = [];
@@ -47,9 +49,9 @@ const createGroup = TryCatch(async (req, res, next) => {
   const groupDetails = await db
     .insert(group)
     .values({
-      groupImage:url[0],
+      groupImage: url[0],
       groupname: groupName,
-      groupType: groupType,
+      groupType: isPrivate ? "private" : "public",
       creatorId: myId,
     })
     .returning();
@@ -61,12 +63,20 @@ const createGroup = TryCatch(async (req, res, next) => {
       role: "superadmin",
     })
     .returning();
+  const members = JSON.parse(req.body.members);
+  const groupMemberList = members.map((u: string) => ({
+    groupId: groupDetails[0]?.id,
+    userId: u,
+    role: "member",
+  }));
+
+  const membersInserted = await db.insert(groupMembers).values(groupMemberList);
 
   return res.status(200).json({
     success: true,
     groupDetails,
     groupMembersDetails,
-    message: "chat Created!",
+    message: "Group Created!",
   });
 });
 
@@ -86,12 +96,14 @@ const getMyGroups = TryCatch(async (req, res, next) => {
         },
       },
     },
-    columns:{
-      unreadCount:true
-    }
+    columns: {
+      unreadCount: true,
+    },
   });
-   const myGroups =  Groups.map((g)=> ({group:{...g.group,unreadCount:g.unreadCount}}))
-  
+  const myGroups = Groups.map((g) => ({
+    group: { ...g.group, unreadCount: g.unreadCount },
+  }));
+
   return res.status(200).json({
     success: true,
     myGroups,
@@ -108,13 +120,13 @@ const getGroupDetails = TryCatch(async (req, res, next) => {
 
   const groupDetails = await db.query.group.findFirst({
     where: (chat, { eq }) => eq(chat.id, groupId),
-    columns: { groupname: true, groupImage: true, groupType: true ,id:true},
+    columns: { id: true, groupname: true, groupImage: true, groupType: true },
   });
   if (!groupDetails) return next(new ErrorHandler("no chat found", 404));
 
   const groupMembers = await db.query.groupMembers.findMany({
-    where: (groupMembers, { eq, ne, and }) =>eq(groupMembers.groupId,groupId),
-      // and(eq(groupMembers.groupId, groupId), ne(groupMembers.userId, myId)),
+    where: (groupMembers, { eq, ne, and }) => eq(groupMembers.groupId, groupId),
+    // and(eq(groupMembers.groupId, groupId), ne(groupMembers.userId, myId)),
     columns: {
       role: true,
     },
@@ -131,10 +143,12 @@ const getGroupDetails = TryCatch(async (req, res, next) => {
     },
   });
 
+  const userGroupMembership = groupMembers.filter((u) => u.user.id === myId);
   if (!groupDetails) return next(new ErrorHandler("group not found", 404));
 
   return res.status(200).json({
     success: true,
+    userGroupMembership,
     groupDetails,
     groupMembers,
     message: "group details!",
@@ -170,11 +184,11 @@ const getGroupMessages = TryCatch(async (req, res, next) => {
     where: (groupMessages, { eq }) => eq(groupMessages.groupId, groupId),
     limit: limit,
     offset: offset,
-    orderBy: (groupMessages, { desc }) => [desc(groupMessages.lastSent)],
+    orderBy: (groupMessages, { desc }) => [desc(groupMessages.createdAt)],
     with: {
       sender: {
         columns: {
-          id:true,
+          id: true,
           name: true,
           avatar: true,
           username: true,
@@ -198,31 +212,6 @@ const getGroupMessages = TryCatch(async (req, res, next) => {
     messages,
     totalMessages,
     totalPages: Math.ceil(totalMessages / limit),
-  });
-});
-const getGroupAttachments = TryCatch(async (req, res, next) => {
-  const groupId = req.params.id;
-  // console.log(chatId, "get messages");
-  const result = await db.query.groupMessages.findMany({
-    where: (groupMessages, { eq ,and,isNotNull}) => and(eq(groupMessages?.groupId,groupId),isNotNull(groupMessages?.attachment)),
-    orderBy: (groupMessages, { desc }) => [desc(groupMessages.lastSent)],
-    with: {
-      sender: {
-        columns: {
-          id:true,
-          name: true,
-          avatar: true,
-          username: true,
-          isOnline: true,
-        },
-      },
-    },
-  });
-  // Return the messages as a JSON response
-  const attachments = result.reverse();
-
-  return res.json({
-    attachments,
   });
 });
 
@@ -249,6 +238,7 @@ const SendAttachment = TryCatch(
     if (!files || files.length === 0) {
       return next(new Error("No files provided"));
     }
+    console.log("m", members);
     const cloudinaryUrls = await uploadToCloudinary(files);
     const messageForDb = {
       content: "",
@@ -271,7 +261,7 @@ const SendAttachment = TryCatch(
     // emitEvent(req,REFETECH_CHATS,membersId,chatId)
     emitEvent(
       req,
-      NEW_MESSAGE,
+      NEW_GROUP_MESSAGE,
       [...membersId, res.locals.userId],
       messageForRealTime
     );
@@ -281,6 +271,40 @@ const SendAttachment = TryCatch(
     });
   }
 );
+const getAttachments = TryCatch(async (req, res, next) => {
+  const groupId = req.params.id;
+
+  const group = await db.query.group.findFirst({
+    where: (group, { eq }) => eq(group?.id, groupId),
+  });
+
+  if (!group) return next(new ErrorHandler("no group found with this id", 404));
+  if (!groupId) return next(new ErrorHandler("no group id provided", 404));
+  const result = await db.query.groupMessages.findMany({
+    where: (groupMessages, { eq, isNotNull, and }) =>
+      and(
+        eq(groupMessages.groupId, groupId),
+        isNotNull(groupMessages?.attachment)
+      ),
+    orderBy: (groupMessages, { desc }) => [desc(groupMessages.createdAt)],
+    with: {
+      sender: {
+        columns: {
+          id: true,
+          name: true,
+          avatar: true,
+        },
+      },
+    },
+  });
+
+  // Return the messages as a JSON response
+  const attachments = result.reverse();
+
+  return res.json({
+    attachments,
+  });
+});
 
 const deleteGroup = TryCatch(async (req, res, next) => {
   const groupId = req.params.id;
@@ -324,13 +348,14 @@ const exitGroup = TryCatch(async (req, res, next) => {
       new ErrorHandler("make some else super admin before leaving group", 400)
     );
 
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(groupMembers)
-      .where(
-        and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, myId))
-      );
-  });
+  const result = await db
+    .delete(groupMembers)
+    .where(
+      and(eq(groupMembers.userId, myId), eq(groupMembers.groupId, groupId))
+    )
+    .returning();
+  console.log(result);
+  emitEvent(req, REFETECH_CHATS, [...myId], "");
 
   return res.json({
     success: true,
@@ -341,41 +366,65 @@ const exitGroup = TryCatch(async (req, res, next) => {
 const joinGroup = TryCatch(async (req, res, next) => {
   const groupId = req.params.id;
   const myId = res.locals.userId;
-  // console.log(chatId, "get messages");
-  const [groupExists,groupMemberCheck] = await Promise.all([
-    await db.query.group.findFirst({
-      where: (group, { eq }) => eq(group.id, groupId),
-    }),
-    await db.query.groupMembers.findFirst({
-      where:(groupMembers,{eq,and})=>and(eq(groupMembers?.id,groupId),eq(groupMembers?.userId,myId))
-    })
-  ])
-  if (!groupExists) return next(new ErrorHandler("group doesn't exists", 404));
-  if (groupMemberCheck) return next(new ErrorHandler("already a member", 404));
+  const { check } = req.body;
 
-  const groupCreated = await db
-    .insert(groupMembers)
-    .values({
-      groupId: groupId,
-      userId: myId,
-      role: "member",
-    })
-    .returning();
+  // Check if the group exists
+  const groupExists = await db.query.group.findFirst({
+    where: (group, { eq }) => eq(group.id, groupId),
+  });
 
+  if (!groupExists) {
+    return next(new ErrorHandler("Group doesn't exist", 404));
+  }
+
+  // Check if user is already a member
+  const isMember = await db.query.groupMembers.findFirst({
+    where: (groupMembers, { eq, and }) =>
+      and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, myId)),
+  });
+
+  if (isMember) {
+    return res.json({
+      success: true,
+      isMember: !!isMember, // true if member, false otherwise
+      group: groupExists,
+    });
+  }
+
+  if (check) {
+    return res.json({
+      success: true,
+      isMember: !!isMember, // true if member, false otherwise
+      group: groupExists,
+    });
+  }
+  if (groupExists.groupType === "private")
+    return next(new ErrorHandler("its a private group request to join,", 400));
+  //logic to send notification for group join
+
+  const groupMembership = await db.insert(groupMembers).values({
+    groupId: groupId,
+    userId: myId,
+    role: "member",
+  });
+  console.log("joined", groupMembership);
+  emitEvent(req, REFETECH_CHATS, [...myId], "");
   return res.json({
     success: true,
-    groupExists,
-    groupCreated,
-    message: "Joined succesfully",
+    isMember: !!isMember, // true if member, false otherwise
+    group: groupExists,
+    groupMembership,
   });
 });
+
+export default joinGroup;
 
 const kickMember = TryCatch(async (req, res, next) => {
   const groupId = req.params.id;
   const { userToBeKicked } = req.body;
   const myId = res.locals.userId;
-
-  if (!userToBeKicked || groupId)
+  console.log(groupId, userToBeKicked);
+  if (!userToBeKicked || !groupId)
     return next(new ErrorHandler("invalid credentails", 400));
   const [myRole, userToBeKickedRole] = await Promise.all([
     await db.query.groupMembers.findFirst({
@@ -470,8 +519,24 @@ const deleteMessage = TryCatch(async (req, res, next) => {
   });
 });
 
+const searchGroups = TryCatch(async (req: Request, res: Response) => {
+  const userId = res.locals.userId;
+  const filterQuery = req.query.filter as string;
+
+  // Using a subquery to determine if user is a member
+  const filteredGroups = await db.query.group.findMany({
+    // where:(group,{ilike})=>ilike(group?.groupname,`${filterQuery}%`)
+  });
+
+  return res.json({
+    success: true,
+    groups: filteredGroups,
+  });
+});
+
 export {
-  getGroupAttachments,
+  searchGroups,
+  getAttachments,
   deleteMessage,
   deleteGroup,
   exitGroup,
@@ -482,7 +547,5 @@ export {
   getGroupDetails,
   kickMember,
   joinGroup,
-  SendAttachment
+  SendAttachment,
 };
-
-
