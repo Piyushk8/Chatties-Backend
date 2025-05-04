@@ -11,6 +11,7 @@ import { emitEvent } from "../utils/helper.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { Request, Response } from "express";
 import { NEW_MESSAGE, REFETECH_CHATS } from "../constants/events.js";
+import { socketService } from "../app.js";
 
 config({ path: "../.env" });
 cloudinary.config({
@@ -190,11 +191,12 @@ const getMessages = TryCatch(async (req, res, next) => {
     where: (message, { eq }) => eq(message.chatId, chatId),
     limit: limit,
     offset: offset,
-    orderBy: (message, { desc }) => [desc(message.createdAt)],
+    orderBy: (message, { asc }) => [asc(message.createdAt)], // Fetch in ascending order
     with: {
       sender: true,
     },
   });
+  
 
   // Count total messages for pagination
   const totalMessagesResult = await db
@@ -214,11 +216,10 @@ const getMessages = TryCatch(async (req, res, next) => {
 });
 const getAttachments = TryCatch(async (req, res, next) => {
   const chatId = req.params.id;
-  console.log(chatId, "get messages");
 
-  
   const result = await db.query.message.findMany({
-    where: (message, { eq ,and,isNotNull}) => and(eq(message.chatId, chatId),isNotNull(message?.attachment)),
+    where: (message, { eq, and, isNotNull }) =>
+      and(eq(message.chatId, chatId), isNotNull(message?.attachment)),
     orderBy: (message, { desc }) => [desc(message.createdAt)],
     with: {
       sender: true,
@@ -236,11 +237,13 @@ const getAttachments = TryCatch(async (req, res, next) => {
 const SendAttachment = TryCatch(
   async (req: Request<{}, {}, { chatId: string }>, res: Response, next) => {
     const { chatId } = req.body;
+    const myId = res.locals.userId
     const chat = await db.query.chat.findFirst({
       where: (chat, { eq }) => eq(chat.id, chatId),
     });
+
     const members = await db.query.chatMembers.findMany({
-      where: (chatMembers, { eq }) => eq(chatMembers.chatId, chatId),
+      where: (chatMembers, { eq ,and ,ne}) => eq(chatMembers.chatId, chatId),
       columns: {
         userId: true,
       },
@@ -271,17 +274,29 @@ const SendAttachment = TryCatch(
         avatar: me?.avatar,
       },
     };
-    const result = await db.insert(message).values(messageForDb);
+    // const result = await db.insert(message).values(messageForDb);
 
     const membersId = members.map((i) => i.userId);
     //!emitevent new message || new message Alert
     // emitEvent(req,REFETECH_CHATS,membersId,chatId)
-    emitEvent(
-      req,
-      NEW_MESSAGE,
-      [...membersId, res.locals.userId],
-      messageForRealTime
-    );
+    // emitEvent(
+    //   req,
+    //   NEW_MESSAGE,
+    //   [...membersId, res.locals.userId],
+    //   messageForRealTime
+    // );
+    // Call WebSocket's handleNewMessage function
+    socketService.handleNewMessageFromAPI({
+      chatId,
+      members: membersId,
+      message: "", // No text content
+      attachment: cloudinaryUrls, // Attachments instead
+      sender: {
+        id: me?.id,
+        name: me?.name,
+        avatar: me?.avatar,
+      },
+    });
 
     res.status(200).json({
       message: "Done",
@@ -325,5 +340,5 @@ export {
   sendMessage,
   createChat,
   getMessages,
-  getAttachments
+  getAttachments,
 };

@@ -31,7 +31,7 @@ import { json } from "drizzle-orm/mysql-core";
 
 export class SocketService {
   private io: Server;
-  private redisService: RedisService;
+  public redisService: RedisService;
 
   constructor(server: any, redisService: RedisService) {
     this.redisService = redisService;
@@ -175,7 +175,7 @@ export class SocketService {
   //remove user's socketId from its group set
   private async removeGroupMemberSocket(
     socketId: string,
-    userId:string,
+    userId: string,
     groupIds: string[] | undefined
   ) {
     if (!groupIds?.length) return;
@@ -191,7 +191,7 @@ export class SocketService {
 
       // Remove socket from all groups
       for (const groupId of allGroupIds) {
-        pipeline.srem(`group:${groupId}:members`,userId);
+        pipeline.srem(`group:${groupId}:members`, userId);
       }
 
       // Clean up socket's group mapping
@@ -293,27 +293,33 @@ export class SocketService {
   }
 
   //handles chat messages
-  private async handleNewMessage(socket: CustomSocket, data: any) {
-    const user = socket.user;
-    const { chatId, members, message } = data;
+  private async handleNewMessage(
+    socket: CustomSocket,
+    data: any,
+    fromAPI = false
+  ) {
+    const user = fromAPI ? data.sender : socket.user; // If from API, use provided sender
+    const { chatId, members, message, attachment } = data;
     if (!chatId || !user) return;
     try {
       // Prepare message data
       const messageData = {
-        content: message,
+        content: message || "", // Empty if only media
+        attachment: attachment || null, // Attachments or empty for text
         sender: user,
-        chatId: chatId,
+        chatId,
         createdAt: new Date().toISOString(),
       };
 
-      socket.emit(NEW_MESSAGE, messageData);
+      // Emit only if it didn’t come from API (to prevent duplication)
+      if (!fromAPI) {
+        socket.emit(NEW_MESSAGE, messageData);
+      }
 
-      //unread message count
+      // Update unread count
       const unreadCountData = await db
         .update(chatMembers)
-        .set({
-          unreadCount: sql`${chatMembers?.unreadCount} + 1`,
-        })
+        .set({ unreadCount: sql`${chatMembers?.unreadCount} + 1` })
         .where(
           and(
             eq(chatMembers?.chatId, chatId),
@@ -322,37 +328,43 @@ export class SocketService {
         )
         .returning({ unreadCount: chatMembers?.unreadCount });
 
-      //send realtime feedback to user
-      // Store message in Redis for real-time delivery
-      await this.redisService.getPublisher().publish(
-        "chat:messages",
-        JSON.stringify({
-          chatId,
-          unreadCountData,
-          message: messageData,
-          members,
-        })
-      );
+      // Publish to Redis for real-time delivery
+      await this.redisService
+        .getPublisher()
+        .publish(
+          "chat:messages",
+          JSON.stringify({
+            chatId,
+            socketId:socket?.id,
+            unreadCountData,
+            message: messageData,
+            members,
+          })
+        );
 
       // Store in database
-      //@ts-ignore
       const result = await db.insert(MessageSchema).values({
-        content: message,
+        content: message || "",
+        attachment: attachment || null,
         sender: user?.id,
-        chatId: chatId,
+        chatId,
       });
 
       // Update chat's last message
       if (result) {
         await db
           .update(chat)
-          .set({ lastMessage: message })
+          .set({ lastMessage: message || "📎 Attachment" })
           .where(eq(chat.id, chatId));
       }
     } catch (error) {
       socket.emit("MESSAGE_ERROR", error);
       console.error("Error handling new message:", error);
     }
+  }
+
+  public async handleNewMessageFromAPI(data: any) {
+    await this.handleNewMessage(null as any, data, true);
   }
 
   private async handleMarkMessagesRead(
@@ -467,7 +479,7 @@ export class SocketService {
           break;
         case "group:messages":
           try {
-            console.log("hearing alright");
+            // console.log("hearing alright");
             const { groupId, socketId, message: messageData } = data;
             const activeSocketIds = await this.redisService
               .getClient()
@@ -512,7 +524,6 @@ export class SocketService {
             data?.isTyping
               ? this.io.to(sockets).emit(IS_TYPING, data)
               : this.io.to(sockets).emit(STOP_TYPING, data);
-
           } catch (error) {
             console.log("error subscribing to typing");
           }
@@ -555,6 +566,7 @@ export class SocketService {
 
       // Handle new messages
       socket.on(NEW_MESSAGE, async (data) => {
+        console.log("here triggered");
         await this.handleNewMessage(socket, data);
       });
       //handle group message

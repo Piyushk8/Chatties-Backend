@@ -12,22 +12,13 @@ import {
   user,
 } from "../drizzle/schema.js";
 import { CloudinaryFile } from "../types/types.js";
-import {
-  v2 as cloudinary,
-  UploadApiErrorResponse,
-  UploadApiResponse,
-} from "cloudinary";
+import { v2 as cloudinary } from "cloudinary";
 import "dotenv";
 import { config } from "dotenv";
 import { emitEvent, getBase64 } from "../utils/helper.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { NextFunction, Request, Response } from "express";
-import {
-  NEW_GROUP_MESSAGE,
-  NEW_MESSAGE,
-  NEW_MESSAGE_ALERT,
-  REFETECH_CHATS,
-} from "../constants/events.js";
+import { NEW_GROUP_MESSAGE, REFETECH_CHATS } from "../constants/events.js";
 
 config({ path: "../.env" });
 cloudinary.config({
@@ -343,7 +334,7 @@ const exitGroup = TryCatch(async (req, res, next) => {
       creatorId: true,
     },
   });
-  if (groupName?.creatorId !== myId)
+  if (groupName?.creatorId === myId)
     return next(
       new ErrorHandler("make some else super admin before leaving group", 400)
     );
@@ -366,7 +357,7 @@ const exitGroup = TryCatch(async (req, res, next) => {
 const joinGroup = TryCatch(async (req, res, next) => {
   const groupId = req.params.id;
   const myId = res.locals.userId;
-  const { check } = req.body;
+  const { check, invite } = req.body;
 
   // Check if the group exists
   const groupExists = await db.query.group.findFirst({
@@ -396,6 +387,21 @@ const joinGroup = TryCatch(async (req, res, next) => {
       success: true,
       isMember: !!isMember, // true if member, false otherwise
       group: groupExists,
+    });
+  }
+  if (invite) {
+    const groupMembership = await db.insert(groupMembers).values({
+      groupId: groupId,
+      userId: myId,
+      role: "member",
+    });
+    console.log("joined", groupMembership);
+    emitEvent(req, REFETECH_CHATS, [...myId], "");
+    return res.json({
+      success: true,
+      isMember: !!isMember, // true if member, false otherwise
+      group: groupExists,
+      groupMembership,
     });
   }
   if (groupExists.groupType === "private")
@@ -519,10 +525,20 @@ const deleteMessage = TryCatch(async (req, res, next) => {
   });
 });
 
-const searchGroups = TryCatch(async (req: Request, res: Response) => {
+const searchGroups = TryCatch(async (req: Request, res: Response, next) => {
   const userId = res.locals.userId;
   const filterQuery = req.query.filter as string;
-
+  const groupId = req.query.groupId as string;
+  if (groupId) {
+    const group = await db.query.group.findFirst({
+      where: (group, { eq }) => eq(group?.id, groupId),
+    });
+    if (!group) return next(new ErrorHandler("invalid link", 404));
+    return res.json({
+      success: true,
+      group,
+    });
+  }
   // Using a subquery to determine if user is a member
   const filteredGroups = await db.query.group.findMany({
     // where:(group,{ilike})=>ilike(group?.groupname,`${filterQuery}%`)
