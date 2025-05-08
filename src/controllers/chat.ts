@@ -191,13 +191,11 @@ const getMessages = TryCatch(async (req, res, next) => {
     where: (message, { eq }) => eq(message.chatId, chatId),
     limit: limit,
     offset: offset,
-    orderBy: (message, { asc }) => [asc(message.createdAt)], // Fetch in ascending order
+    orderBy: (message, { desc }) => [desc(message.createdAt)], // Fetch in ascending order
     with: {
       sender: true,
     },
   });
-  
-
   // Count total messages for pagination
   const totalMessagesResult = await db
     .select({ count: count(message.id) })

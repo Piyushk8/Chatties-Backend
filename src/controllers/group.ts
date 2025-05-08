@@ -103,7 +103,6 @@ const getMyGroups = TryCatch(async (req, res, next) => {
 });
 
 const getGroupDetails = TryCatch(async (req, res, next) => {
-  //MY userid
   const myId = res.locals.userId;
   const { id: groupId } = req.params;
 
@@ -111,16 +110,18 @@ const getGroupDetails = TryCatch(async (req, res, next) => {
 
   const groupDetails = await db.query.group.findFirst({
     where: (chat, { eq }) => eq(chat.id, groupId),
-    columns: { id: true, groupname: true, groupImage: true, groupType: true },
+    columns: {
+      id: true,
+      groupname: true,
+      groupImage: true,
+      groupType: true,
+      createdAt: true,
+    },
   });
   if (!groupDetails) return next(new ErrorHandler("no chat found", 404));
-
   const groupMembers = await db.query.groupMembers.findMany({
-    where: (groupMembers, { eq, ne, and }) => eq(groupMembers.groupId, groupId),
-    // and(eq(groupMembers.groupId, groupId), ne(groupMembers.userId, myId)),
-    columns: {
-      role: true,
-    },
+    where: (groupMembers, { eq }) => eq(groupMembers.groupId, groupId),
+    columns: { role: true },
     with: {
       user: {
         columns: {
@@ -136,7 +137,6 @@ const getGroupDetails = TryCatch(async (req, res, next) => {
 
   const userGroupMembership = groupMembers.filter((u) => u.user.id === myId);
   if (!groupDetails) return next(new ErrorHandler("group not found", 404));
-
   return res.status(200).json({
     success: true,
     userGroupMembership,
@@ -229,7 +229,6 @@ const SendAttachment = TryCatch(
     if (!files || files.length === 0) {
       return next(new Error("No files provided"));
     }
-    console.log("m", members);
     const cloudinaryUrls = await uploadToCloudinary(files);
     const messageForDb = {
       content: "",
@@ -345,7 +344,6 @@ const exitGroup = TryCatch(async (req, res, next) => {
       and(eq(groupMembers.userId, myId), eq(groupMembers.groupId, groupId))
     )
     .returning();
-  console.log(result);
   emitEvent(req, REFETECH_CHATS, [...myId], "");
 
   return res.json({
@@ -395,25 +393,19 @@ const joinGroup = TryCatch(async (req, res, next) => {
       userId: myId,
       role: "member",
     });
-    console.log("joined", groupMembership);
     emitEvent(req, REFETECH_CHATS, [...myId], "");
     return res.json({
       success: true,
-      isMember: !!isMember, // true if member, false otherwise
+      isMember: false, // true if member, false otherwise
       group: groupExists,
       groupMembership,
     });
   }
-  if (groupExists.groupType === "private")
-    return next(new ErrorHandler("its a private group request to join,", 400));
-  //logic to send notification for group join
-
   const groupMembership = await db.insert(groupMembers).values({
     groupId: groupId,
     userId: myId,
     role: "member",
   });
-  console.log("joined", groupMembership);
   emitEvent(req, REFETECH_CHATS, [...myId], "");
   return res.json({
     success: true,
@@ -429,7 +421,6 @@ const kickMember = TryCatch(async (req, res, next) => {
   const groupId = req.params.id;
   const { userToBeKicked } = req.body;
   const myId = res.locals.userId;
-  console.log(groupId, userToBeKicked);
   if (!userToBeKicked || !groupId)
     return next(new ErrorHandler("invalid credentails", 400));
   const [myRole, userToBeKickedRole] = await Promise.all([
@@ -541,7 +532,7 @@ const searchGroups = TryCatch(async (req: Request, res: Response, next) => {
   }
   // Using a subquery to determine if user is a member
   const filteredGroups = await db.query.group.findMany({
-    // where:(group,{ilike})=>ilike(group?.groupname,`${filterQuery}%`)
+    where: (group, { ilike }) => ilike(group?.groupname, `${filterQuery}%`),
   });
 
   return res.json({

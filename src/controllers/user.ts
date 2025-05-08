@@ -27,7 +27,10 @@ const newUser = TryCatch(
       urls.length >= 1 ? { url: urls[0], public_id: name } : null;
     if (!username || !password || !name)
       next(new ErrorHandler("Data not sufficient", 400));
-
+    const userExists = await db.query.user.findFirst({
+      where:(user,{eq})=>eq(user.username,username)
+    })
+    if(userExists) return res.json({success:false,message:"username already exists!"})
     const newUser = await db
       .insert(user)
       .values({
@@ -100,7 +103,6 @@ const getMyDetails = TryCatch(async (req, res, next) => {
   // })
   const pinnedChatIds = userDetail?.pinnedChats.map((i) => i.chatId || i.groupId);
   const mutedChatIds = userDetail?.mutedChats.map((i) => i.chatId || i.groupId);
-  console.log(userDetail);
   res.json({
     success: true,
     mutedChatIds,
@@ -127,7 +129,6 @@ const searchUser = TryCatch(
 );
 const logout = TryCatch(async (req, res, next) => {
   const userId = res.locals.userId;
-  console.log(userId);
   return res
     .status(200)
     .cookie("token", "", {

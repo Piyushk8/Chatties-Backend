@@ -463,7 +463,7 @@ export class SocketService {
                   ?.getClient()
                   .hget("user:sockets", member);
               })
-            );
+            );console.log("here")
             this.io.to(sockets).emit(NEW_MESSAGE, {
               chatId: data.chatId,
               message: data.message,
@@ -566,7 +566,6 @@ export class SocketService {
 
       // Handle new messages
       socket.on(NEW_MESSAGE, async (data) => {
-        console.log("here triggered");
         await this.handleNewMessage(socket, data);
       });
       //handle group message
